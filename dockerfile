@@ -2,8 +2,8 @@ FROM node:20-bullseye-slim
 
 ARG ARCH=x86-64-bmi2
 
-# ENV API_TOKEN=
-ENV PORT=3000
+ENV API_TOKEN=
+ENV PORT=4000
 
 # Install OS dependencies
 RUN apt-get update
@@ -33,6 +33,6 @@ COPY ./server/package-lock.json /app/package-lock.json
 COPY ./server/package.json /app/package.json
 RUN npm ci
 
-EXPOSE $PORT
+EXPOSE 4000
 
 ENTRYPOINT ["npm", "start"]

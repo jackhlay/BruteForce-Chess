@@ -4,8 +4,10 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net/url"
 	"sync"
 
+	"github.com/gorilla/websocket"
 	"github.com/notnil/chess"
 )
 
@@ -24,23 +26,58 @@ func exploreMoves(game *chess.Game, depth int, wg *sync.WaitGroup, pool chan str
 
 	for _, move := range legalMoves {
 		useGame := game.Clone()
+		startfen := useGame.Position().String()
 		err := useGame.Move(move)
 		if err != nil {
 			log.Fatalf("Error making move: %v", err)
 		}
+		endfen := useGame.Position().String()
 
 		pool <- struct{}{} // Acquire worker
 		wgDepth.Add(1)     // Add to depth wait group
 
-		go func(game *chess.Game, depth int) {
+		go func(game *chess.Game, depth int, startfen, endfen string) {
 			defer func() {
-				<-pool // Release  the worker to the pool
+				<-pool // Release the worker to the pool
 				wgDepth.Done()
 			}()
-			fen := game.Position().String()
-			//send the fen to stockfish pods and in house eval, then to dqn for training
+
+			socketPath := "ws://localhost:4000"
+			u, err := url.Parse(socketPath)
+			if err != nil {
+				log.Fatalf("Error parsing WebSocket URL: %v", err) // Fixed error handling
+			}
+
+			conn, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
+			if err != nil { // Added error handling for WebSocket connection
+				log.Fatalf("Error connecting to WebSocket: %v", err)
+			}
+
+			startrating, err := processFen(conn, startfen) // Added error handling
+			if err != nil {
+				log.Fatalf("Error processing start FEN: %v", err)
+			}
+
+			endrating, err := processFen(conn, endfen) // Added error handling
+			if err != nil {
+				log.Fatalf("Error processing end FEN: %v", err)
+			}
+			conn.Close()
+
+			data := map[string]interface{}{
+				"startFen":    startfen,
+				"startRating": startrating,
+				"endFen":      endfen,
+				"endRating":   endrating,
+			}
+
+			// Send data to DQN or handle further as needed
+			// Update pod name in redis with fen string and depth in case of crash
+			// Here you would send `data` to your DQN for training
+
+			// Continue exploring moves recursively
 			exploreMoves(game, depth-1, wg, pool, done)
-		}(useGame, depth-1)
+		}(useGame, depth-1, startfen, endfen) // Pass startfen and endfen to the goroutine
 	}
 
 	// Wait for all moves at the current depth level to complete
@@ -62,12 +99,29 @@ func main() {
 	game := chess.NewGame()
 	position := game.Position()
 	moves := position.ValidMoves()
+	startfen := position.String()
 
 	fmt.Printf("ROUND 1\n")
 	err := game.Move(moves[moveIndex])
 	if err != nil {
 		log.Fatalf("Error making move: %v", err)
 	}
+
+	endfen := position.String()
+
+	socketPath := "ws://localhost:4000"
+	u, err := url.Parse(socketPath)
+	conn, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
+	rating, _ := processFen(conn, endfen)
+	conn.Close()
+
+	data := map[string]interface{}{
+		"startFen":    startfen,
+		"startRating": 0.0,
+		"endFen":      endfen,
+		"endRating":   rating,
+	}
+	//send to dqn
 
 	pool := make(chan struct{}, maxWorkers)
 	done := make(chan struct{}) // Channel to signal when depth is done
