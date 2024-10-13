@@ -1,0 +1,13 @@
+{
+  "name": "dockfish",
+  "license": "AGPL-3.0-or-later",
+  "version": "0.0.0",
+  "main": "index.js",
+  "private": true,
+  "scripts": {
+    "start": "node ./index.mjs"
+  },
+  "dependencies": {
+    "ws": "8.17.1"
+  }
+}

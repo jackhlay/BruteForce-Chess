@@ -132,7 +132,6 @@ func DQNmain() {
 		// Reset the VM for each epoch
 		vm.Reset()
 
-		// Assume you have a function to sample a batch of states and targets
 		xBatch, targetBatch := getBatchData() // Get positions from k3s pod, should include stockfish and in house rating for each move to train on
 
 		G.Let(x, xBatch)
