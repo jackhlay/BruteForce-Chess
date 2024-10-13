@@ -94,7 +94,7 @@ func processFen(conn *websocket.Conn, fen string) (string, error) {
 	log.Println("Looking for evaluation score (depth=25)...")
 	uciCommands := []string{
 		fmt.Sprintf("position fen %s", fen),
-		"go depth 25",
+		"go depth 8",
 	}
 
 	// Send commands to Stockfish

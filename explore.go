@@ -67,6 +67,7 @@ func exploreMoves(game *chess.Game, depth int, wg *sync.WaitGroup, pool chan str
 			data := map[string]interface{}{
 				"startFen":    startfen,
 				"startRating": startrating,
+				"action":      move.String(),
 				"endFen":      endfen,
 				"endRating":   endrating,
 			}
@@ -118,6 +119,7 @@ func main() {
 	data := map[string]interface{}{
 		"startFen":    startfen,
 		"startRating": 0.0,
+		"action":      moves[moveIndex].String(),
 		"endFen":      endfen,
 		"endRating":   rating,
 	}
