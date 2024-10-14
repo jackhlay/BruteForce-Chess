@@ -72,6 +72,7 @@ func exploreMoves(game *chess.Game, depth int, wg *sync.WaitGroup, pool chan str
 				"endRating":   endrating,
 			}
 
+			sendJSON("urlforDQNPOD", data)
 			// Send data to DQN or handle further as needed
 			// Update pod name in redis with fen string and depth in case of crash
 			// Here you would send `data` to your DQN for training
@@ -123,6 +124,8 @@ func main() {
 		"endFen":      endfen,
 		"endRating":   rating,
 	}
+	sendJSON("urlforDQNPOD", data)
+
 	//send to dqn
 
 	pool := make(chan struct{}, maxWorkers)

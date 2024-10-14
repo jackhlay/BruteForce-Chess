@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"log"
 	"math/rand"
@@ -21,13 +22,25 @@ var (
 	cpuprofile = flag.String("cpuprofile", "", "CPU profiling")
 )
 
+type Data struct {
+	StartFEN    *tensor.Dense
+	StartRating float64
+	Action      string
+	EndFEN      *tensor.Dense
+	EndRating   float64
+}
+
+var trainingData []Data
+
+var actionMap map[string]int // Load with Legal moves every time called.
+
 const boardDepth = 12
 const boardSize = 8
 
 var dt tensor.Dtype
 
 func parseDtype() {
-	dt = tensor.Float32 // Use float32 for the DQN
+	dt = tensor.Float32
 }
 
 type dqn struct {
@@ -132,7 +145,7 @@ func DQNmain() {
 		// Reset the VM for each epoch
 		vm.Reset()
 
-		xBatch, targetBatch := getBatchData() // Get positions from k3s pod, should include stockfish and in house rating for each move to train on
+		xBatch, targetBatch := getBatchData(trainingData) //the data coming in is turned into appropriate types (Tensor, float, string, Tensor, float), and into Data slice
 
 		G.Let(x, xBatch)
 		G.Let(target, targetBatch)
@@ -158,6 +171,80 @@ func DQNmain() {
 
 	// Cleanup
 	cleanup(sigChan, doneChan)
+}
+
+func getBatchData(tData []Data) (*tensor.Dense, *tensor.Dense) {
+	batchSize := len(tData) // Determine batch size from input data
+
+	xBacking := make([]float32, batchSize*boardDepth*boardSize*boardSize) // For xBatch
+	targetBacking := make([]float32, batchSize*1876)                      // For targetBatch
+
+	// Create tensors
+	xBatch := tensor.New(tensor.WithShape(batchSize, boardDepth, boardSize, boardSize), tensor.WithBacking(xBacking))
+	targetBatch := tensor.New(tensor.WithShape(batchSize, 1876), tensor.WithBacking(targetBacking))
+
+	for i, data := range tData {
+		// Populate the input tensor
+		// Assuming data.StartFEN is already in the correct format
+		// You might need to set the tensor data correctly based on your tensor's structure
+		for j := 0; j < boardDepth*boardSize*boardSize; j++ {
+			xBatch.Set(i, data.StartFEN) // Replace with correct method to set data
+		}
+
+		// Calculate the reward for the current data instance
+		reward := data.EndRating - data.StartRating
+
+		// Create a target tensor with Q-values
+		targetQValues := make([]float32, 1876) // Initialize to zero or some base value
+
+		// Example: Update the Q-value for the action taken
+		actionIndex := getActionIndex(data.Action)   // Implement this to map action to index
+		targetQValues[actionIndex] = float32(reward) // Set the reward for the action
+
+		// Populate the target tensor
+		for j := 0; j < 1876; j++ {
+			targetBatch.Set(i, targetQValues[j]) // Replace with correct method to set data
+		}
+	}
+
+	return xBatch, targetBatch // Return the populated tensors
+}
+
+func handleIncomingJSON(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var data RequestData
+	err := json.NewDecoder(r.Body).Decode(&data)
+	if err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
+
+	startPlane, _ := makePlanes(data.startfen)
+	endPlane, _ := makePlanes(data.endfen)
+	Tdata := Data{
+		StartFEN:    startPlane,
+		StartRating: 0,
+		Action:      "move",
+		EndFEN:      endPlane,
+		EndRating:   0,
+	}
+	trainingData = append(trainingData, Tdata)
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func listen() {
+	http.HandleFunc("/your-endpoint", handleIncomingJSON) // Define your route here
+
+	log.Println("Starting server on :5000...")
+	if err := http.ListenAndServe(":5000", nil); err != nil {
+		log.Fatal(err)
+	}
 }
 
 func cleanup(sigChan chan os.Signal, doneChan chan bool) {
