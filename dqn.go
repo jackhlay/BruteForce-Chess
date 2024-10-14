@@ -224,8 +224,8 @@ func handleIncomingJSON(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	startPlane, _ := makePlanes(data.startfen)
-	endPlane, _ := makePlanes(data.endfen)
+	startPlane, _ := makePlanes(data.Startfen)
+	endPlane, _ := makePlanes(data.Endfen)
 	Tdata := Data{
 		StartFEN:    startPlane,
 		StartRating: 0,
