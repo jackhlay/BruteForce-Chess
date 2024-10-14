@@ -65,11 +65,11 @@ func exploreMoves(game *chess.Game, depth int, wg *sync.WaitGroup, pool chan str
 			conn.Close()
 
 			data := map[string]interface{}{
-				"startFen":    startfen,
-				"startRating": startrating,
-				"action":      move.String(),
-				"endFen":      endfen,
-				"endRating":   endrating,
+				"StartFen":    startfen,
+				"StartRating": startrating,
+				"Action":      move.String(),
+				"EndFen":      endfen,
+				"EndRating":   endrating,
 			}
 
 			sendJSON("urlforDQNPOD", data)
@@ -118,11 +118,11 @@ func main() {
 	conn.Close()
 
 	data := map[string]interface{}{
-		"startFen":    startfen,
-		"startRating": 0.0,
-		"action":      moves[moveIndex].String(),
-		"endFen":      endfen,
-		"endRating":   rating,
+		"StartFen":    startfen,
+		"StartRating": 0.0,
+		"Action":      moves[moveIndex].String(),
+		"EndFen":      endfen,
+		"EndRating":   rating,
 	}
 	sendJSON("urlforDQNPOD", data)
 
