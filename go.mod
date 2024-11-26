@@ -3,6 +3,7 @@ module chess-ml
 go 1.22.0
 
 require (
+	github.com/gorilla/websocket v1.5.3
 	github.com/notnil/chess v1.9.0
 	gorgonia.org/gorgonia v0.9.18
 	gorgonia.org/tensor v0.9.23
@@ -17,7 +18,6 @@ require (
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/flatbuffers v2.0.6+incompatible // indirect
 	github.com/google/uuid v1.3.0 // indirect
-	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/leesper/go_rng v0.0.0-20190531154944-a612b043e353 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/xtgo/set v1.0.0 // indirect

@@ -39,40 +39,32 @@ func pieceCharToIndex(piece rune) int {
 }
 
 func makePlanes(fen string) (*tensor.Dense, error) {
-	planes := make([][][]int, 12)
-	for i := range planes {
-		planes[i] = make([][]int, 8)
-		for j := range planes[i] {
-			planes[i][j] = make([]int, 8)
-		}
-	}
-	//parse the fen string, and run the pieces into their respective planes
+	// Initialize the planes (12 planes for the 12 piece types on an 8x8 board)
+	planes := make([]float32, 12*boardSize*boardSize)
 
+	// Split FEN string into its components
 	parts := strings.Split(fen, " ")
-	rows := []rune(parts[0])
+	rows := []rune(parts[0]) // The board layout is the first part of the FEN
 	rank := 0
 	file := 0
 
+	// Iterate over the characters in the FEN string (the board layout)
 	for _, char := range rows {
 		if char >= '1' && char <= '8' {
+			// A number means empty squares. Skip the number of squares.
 			file += int(char - '0')
 		} else if char == '/' {
+			// New rank (row) in the FEN string
 			rank++
 			file = 0
 		} else {
-			planes[pieceCharToIndex(char)][rank][file] = 1
+			// For pieces, determine the correct plane index and set the square to 1
+			pieceIndex := pieceCharToIndex(char)
+			planes[pieceIndex*boardSize*boardSize+rank*boardSize+file] = 1
 			file++
 		}
-
-		tensorData := make([]float64, 12*8*8)
-		for i := 0; i < 12; i++ {
-			for r := 0; r < 8; r++ {
-				for f := 0; f < 8; f++ {
-					tensorData[i*8*8+r*8+f] = float64(planes[i][r][f])
-				}
-			}
-		}
-		return tensor.New(tensor.WithShape(1, 12, 8, 8), tensor.WithBacking(tensorData)), nil
 	}
-	return nil, nil
+
+	// Create a tensor with shape (1, 12, 8, 8) to represent the planes
+	return tensor.New(tensor.WithShape(1, 12, boardSize, boardSize), tensor.WithBacking(planes)), nil
 }

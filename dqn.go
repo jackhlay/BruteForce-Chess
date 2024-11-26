@@ -1,9 +1,11 @@
 package main
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"flag"
 	"log"
+	"math"
 	"math/rand"
 	"os"
 	"os/signal"
@@ -30,14 +32,25 @@ type Data struct {
 	EndRating   float64
 }
 
+type RequestData struct {
+	Startfen    string  `json:"startFEN"`
+	StartRating float64 `json:"startRating"`
+	Endfen      string  `json:"endFEN"`
+	EndRating   float64 `json:"EndRating"`
+	Action      string  `json:"action"`
+}
+
 var trainingData []Data
 
 var actionMap map[string]int // Load with Legal moves every time called.
+
+var epsilon = 0.1 // Exploration rate
 
 const boardDepth = 12
 const boardSize = 8
 
 var dt tensor.Dtype
+var costVal G.Value
 
 func parseDtype() {
 	dt = tensor.Float32
@@ -142,6 +155,11 @@ func DQNmain() {
 
 	// Main training loop
 	for i := 0; i < *epochs; i++ {
+		log.Printf("Epoch %d | Cost: %v | Epsilon: %v", i, costVal, epsilon)
+		if i%10 == 0 {
+			epsilon = math.Max(0.01, epsilon*0.99) // Decay epsilon
+		}
+
 		// Reset the VM for each epoch
 		vm.Reset()
 
@@ -173,41 +191,50 @@ func DQNmain() {
 	cleanup(sigChan, doneChan)
 }
 
+func chooseAction(qValues []float32) int {
+	if rand.Float64() < epsilon {
+		return rand.Intn(len(qValues)) // Random action
+	}
+	maxIdx := 0
+	for i, v := range qValues {
+		if v > qValues[maxIdx] {
+			maxIdx = i
+		}
+	}
+	return maxIdx
+}
+
+func getActionIndex(action string) int {
+	if idx, exists := actionMap[action]; exists {
+		return idx
+	}
+	log.Fatalf("Action %s not found in action map", action)
+	return -1
+}
+
 func getBatchData(tData []Data) (*tensor.Dense, *tensor.Dense) {
-	batchSize := len(tData) // Determine batch size from input data
+	batchSize := len(tData)
 
-	xBacking := make([]float32, batchSize*boardDepth*boardSize*boardSize) // For xBatch
-	targetBacking := make([]float32, batchSize*1876)                      // For targetBatch
+	xBacking := make([]float32, batchSize*boardDepth*boardSize*boardSize)
+	targetBacking := make([]float32, batchSize*1876)
 
-	// Create tensors
 	xBatch := tensor.New(tensor.WithShape(batchSize, boardDepth, boardSize, boardSize), tensor.WithBacking(xBacking))
 	targetBatch := tensor.New(tensor.WithShape(batchSize, 1876), tensor.WithBacking(targetBacking))
 
 	for i, data := range tData {
-		// Populate the input tensor
-		// Assuming data.StartFEN is already in the correct format
-		// You might need to set the tensor data correctly based on your tensor's structure
-		for j := 0; j < boardDepth*boardSize*boardSize; j++ {
-			xBatch.Set(i, data.StartFEN) // Replace with correct method to set data
-		}
+		// Copy StartFEN tensor data into xBatch
+		startFENData := data.StartFEN.Data().([]float32)
+		copy(xBacking[i*boardDepth*boardSize*boardSize:], startFENData)
 
-		// Calculate the reward for the current data instance
+		// Calculate reward
 		reward := data.EndRating - data.StartRating
 
-		// Create a target tensor with Q-values
-		targetQValues := make([]float32, 1876) // Initialize to zero or some base value
-
-		// Example: Update the Q-value for the action taken
-		actionIndex := getActionIndex(data.Action)   // Implement this to map action to index
-		targetQValues[actionIndex] = float32(reward) // Set the reward for the action
-
-		// Populate the target tensor
-		for j := 0; j < 1876; j++ {
-			targetBatch.Set(i, targetQValues[j]) // Replace with correct method to set data
-		}
+		// Update Q-values
+		actionIndex := getActionIndex(data.Action)
+		targetBacking[i*1876+actionIndex] = float32(reward)
 	}
 
-	return xBatch, targetBatch // Return the populated tensors
+	return xBatch, targetBatch
 }
 
 func handleIncomingJSON(w http.ResponseWriter, r *http.Request) {
@@ -228,23 +255,46 @@ func handleIncomingJSON(w http.ResponseWriter, r *http.Request) {
 	endPlane, _ := makePlanes(data.Endfen)
 	Tdata := Data{
 		StartFEN:    startPlane,
-		StartRating: 0,
-		Action:      "move",
+		StartRating: data.StartRating,
+		Action:      data.Action,
 		EndFEN:      endPlane,
-		EndRating:   0,
+		EndRating:   data.EndRating,
 	}
 	trainingData = append(trainingData, Tdata)
 
 	w.WriteHeader(http.StatusOK)
 }
 
-func listen() {
-	http.HandleFunc("/your-endpoint", handleIncomingJSON) // Define your route here
-
-	log.Println("Starting server on :5000...")
-	if err := http.ListenAndServe(":5000", nil); err != nil {
-		log.Fatal(err)
+func saveModel(filename string, weights ...*G.Node) error {
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
 	}
+	defer file.Close()
+
+	for _, weight := range weights {
+		w := weight.Value().Data().([]float32)
+		if err := binary.Write(file, binary.LittleEndian, w); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func loadModel(filename string, weights ...*G.Node) error {
+	file, err := os.Open(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	for _, weight := range weights {
+		w := weight.Value().Data().([]float32)
+		if err := binary.Read(file, binary.LittleEndian, w); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func cleanup(sigChan chan os.Signal, doneChan chan bool) {
@@ -254,5 +304,62 @@ func cleanup(sigChan chan os.Signal, doneChan chan bool) {
 		os.Exit(1)
 	case <-doneChan:
 		return
+	}
+}
+
+// ENDPOINT CODE
+
+func handlePredict(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var data struct {
+		StartFEN string `json:"startFEN"`
+	}
+	err := json.NewDecoder(r.Body).Decode(&data)
+	if err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
+
+	g := G.NewGraph()
+	m := newDQN(g)
+
+	startPlane, _ := makePlanes(data.StartFEN)
+	x := tensor.New(tensor.WithShape(1, boardDepth, boardSize, boardSize), tensor.WithBacking(startPlane.Data()))
+
+	// Create the computation graph node using the tensor
+	node := G.NewTensor(g, dt, 4, G.WithShape(1, boardDepth, boardSize, boardSize), G.WithValue(x))
+
+	// Perform the forward pass with the created node
+	if err := m.fwd(node); err != nil {
+		http.Error(w, "Model forward pass failed", http.StatusInternalServerError)
+		return
+	}
+
+	// Get Q-values and pick the best action
+	qValues := m.out.Value().Data().([]float32)
+	bestActionIdx := chooseAction(qValues)
+
+	for action, idx := range actionMap {
+		if idx == bestActionIdx {
+			json.NewEncoder(w).Encode(map[string]string{"bestMove": action})
+			return
+		}
+	}
+
+	http.Error(w, "Failed to determine best move", http.StatusInternalServerError)
+}
+
+func listen() {
+	http.HandleFunc("/your-endpoint", handleIncomingJSON) // Define your route here
+	http.HandleFunc("/predict", handlePredict)            // Define your route here
+
+	log.Println("Starting server on :5000...")
+	if err := http.ListenAndServe(":5000", nil); err != nil {
+		log.Fatal(err)
 	}
 }

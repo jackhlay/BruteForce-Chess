@@ -89,7 +89,7 @@ func exploreMoves(game *chess.Game, depth int, wg *sync.WaitGroup, pool chan str
 	}()
 }
 
-func main() {
+func fmain() {
 	var moveIndex int
 	flag.IntVar(&moveIndex, "move", 0, "Index of the opening move / pod number")
 	flag.Parse()
@@ -111,7 +111,7 @@ func main() {
 
 	endfen := position.String()
 
-	socketPath := "ws://localhost:4000"
+	socketPath := "ws://10.0.0.112:4000"
 	u, err := url.Parse(socketPath)
 	conn, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
 	rating, _ := processFen(conn, endfen)
@@ -124,7 +124,7 @@ func main() {
 		"EndFen":      endfen,
 		"EndRating":   rating,
 	}
-	sendJSON("urlforDQNPOD", data)
+	sendJSON("10.0.0.112:6789", data)
 
 	//send to dqn
 

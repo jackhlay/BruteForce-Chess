@@ -40,16 +40,6 @@ wss.on("connection", (ws) => {
     try {
       const messageData = JSON.parse(message);
       switch (messageData.type) {
-        case "auth:authenticate":
-          console.debug("[authenticate]", messageData.payload);
-
-          if (!API_TOKEN || messageData.payload === API_TOKEN) {
-            isAuthenticated = true;
-            ws.send(JSON.stringify({ type: "auth:authenticated" }));
-          } else {
-            ws.send(JSON.stringify({ type: "auth:unauthenticated" }));
-          }
-          break;
         case "uci:command":
           console.debug("[uci:command]", messageData.payload);
 

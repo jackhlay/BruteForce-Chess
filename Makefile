@@ -1,2 +1,2 @@
 all:
-	docker build -t "ivangabriele/dockfish" .
+	docker build -p 4000:4000 -t "ivangabriele/dockfish" .
