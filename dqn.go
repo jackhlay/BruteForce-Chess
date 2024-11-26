@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/binary"
-	"encoding/json"
 	"flag"
 	"log"
 	"math"
@@ -237,34 +236,6 @@ func getBatchData(tData []Data) (*tensor.Dense, *tensor.Dense) {
 	return xBatch, targetBatch
 }
 
-func handleIncomingJSON(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
-		return
-	}
-
-	var data RequestData
-	err := json.NewDecoder(r.Body).Decode(&data)
-	if err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
-		return
-	}
-	defer r.Body.Close()
-
-	startPlane, _ := makePlanes(data.Startfen)
-	endPlane, _ := makePlanes(data.Endfen)
-	Tdata := Data{
-		StartFEN:    startPlane,
-		StartRating: data.StartRating,
-		Action:      data.Action,
-		EndFEN:      endPlane,
-		EndRating:   data.EndRating,
-	}
-	trainingData = append(trainingData, Tdata)
-
-	w.WriteHeader(http.StatusOK)
-}
-
 func saveModel(filename string, weights ...*G.Node) error {
 	file, err := os.Create(filename)
 	if err != nil {
@@ -304,62 +275,5 @@ func cleanup(sigChan chan os.Signal, doneChan chan bool) {
 		os.Exit(1)
 	case <-doneChan:
 		return
-	}
-}
-
-// ENDPOINT CODE
-
-func handlePredict(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
-		return
-	}
-
-	var data struct {
-		StartFEN string `json:"startFEN"`
-	}
-	err := json.NewDecoder(r.Body).Decode(&data)
-	if err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
-		return
-	}
-	defer r.Body.Close()
-
-	g := G.NewGraph()
-	m := newDQN(g)
-
-	startPlane, _ := makePlanes(data.StartFEN)
-	x := tensor.New(tensor.WithShape(1, boardDepth, boardSize, boardSize), tensor.WithBacking(startPlane.Data()))
-
-	// Create the computation graph node using the tensor
-	node := G.NewTensor(g, dt, 4, G.WithShape(1, boardDepth, boardSize, boardSize), G.WithValue(x))
-
-	// Perform the forward pass with the created node
-	if err := m.fwd(node); err != nil {
-		http.Error(w, "Model forward pass failed", http.StatusInternalServerError)
-		return
-	}
-
-	// Get Q-values and pick the best action
-	qValues := m.out.Value().Data().([]float32)
-	bestActionIdx := chooseAction(qValues)
-
-	for action, idx := range actionMap {
-		if idx == bestActionIdx {
-			json.NewEncoder(w).Encode(map[string]string{"bestMove": action})
-			return
-		}
-	}
-
-	http.Error(w, "Failed to determine best move", http.StatusInternalServerError)
-}
-
-func listen() {
-	http.HandleFunc("/your-endpoint", handleIncomingJSON) // Define your route here
-	http.HandleFunc("/predict", handlePredict)            // Define your route here
-
-	log.Println("Starting server on :5000...")
-	if err := http.ListenAndServe(":5000", nil); err != nil {
-		log.Fatal(err)
 	}
 }

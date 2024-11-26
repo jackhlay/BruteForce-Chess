@@ -28,7 +28,7 @@ type Message struct {
 }
 
 // clientMain initializes the WebSocket connection and starts the process.
-func main() {
+func SFmain() {
 	u := url.URL{Scheme: "ws", Host: hostString, Path: "/"}
 	fmt.Println("Connecting to", u.String())
 
