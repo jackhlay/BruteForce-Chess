@@ -13,7 +13,7 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-var hostString = "10.0.0.112:4000" //Hits the container, and gets logged. Container ignores the input though...
+var hostString = "localhost:4000" //Hits the container, and gets logged. Container ignores the input though...
 
 var (
 	isEngineReady   bool
@@ -36,6 +36,7 @@ func main() {
 	if err != nil {
 		log.Fatal("Dial error:", err)
 	}
+	time.Sleep(time.Millisecond * 700)
 	defer conn.Close()
 
 	go listenForMessages(conn)
@@ -107,7 +108,7 @@ func processFen(conn *websocket.Conn, fen string) (string, error) {
 	log.Println("Looking for evaluation score (depth=14)...")
 	uciCommands := []string{
 		fmt.Sprintf("position fen %s", fen),
-		"go depth 14",
+		"go depth 8",
 	}
 
 	// Send commands to Stockfish
