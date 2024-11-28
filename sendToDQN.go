@@ -7,10 +7,10 @@ import (
 	"net/http"
 )
 
-func sendJSON(url string, data PosData) {
+func sendJSON(data PosData) {
 	//send to dqn
 	jsonData, _ := json.Marshal(data)
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
+	resp, err := http.Post("http://127.0.0.1:8000/", "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		fmt.Println("Error Making POST req: ", err)
 	}
@@ -19,7 +19,7 @@ func sendJSON(url string, data PosData) {
 
 	// Check the response
 	if resp.StatusCode == http.StatusOK {
-		fmt.Println(resp)
+		fmt.Printf("200OK %s\n", resp.Body)
 	} else {
 		fmt.Printf("Failed with status code: %d\n", resp.StatusCode)
 	}

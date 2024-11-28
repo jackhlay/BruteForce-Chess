@@ -24,7 +24,7 @@ type EngineConf struct {
 
 var engineConf = EngineConf{
 	isEngineReady:   false,
-	socketPath:      fmt.Sprint("ws://%s", hostString),
+	socketPath:      fmt.Sprintf("ws://%s", hostString),
 	evaluationScore: math.NaN(), // This variable will hold the evaluation score,
 
 }
@@ -108,7 +108,7 @@ func handleMessage(message []byte) {
 func processFen(conn *websocket.Conn, fen string) (float64, error) {
 	// Wait for the engine to be ready before sending any commands
 	// if err := waitForEngineToBeReady(conn); err != nil {
-	// 	return "", err
+	// 	return -1.0, err
 	// }
 
 	sendCommand(conn, "ucinewgame")

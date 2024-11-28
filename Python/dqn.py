@@ -4,13 +4,13 @@ import torch.nn as nn
 import torch.optim as optim
 import random
 import numpy as np
+import uvicorn
 import logging
-import os
-import threading
 from queue import Queue
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List
+from asyncio import create_task, sleep
 
 # Hyperparameters
 epochs = 100
@@ -26,12 +26,11 @@ board_depth = 12
 board_size = 8
 action_size = 300  # Example action size
 
-# Data queue for storing samples
+# Global Data queue for storing samples (shared across FastAPI app and training loop)
 data_queue = Queue(maxsize=7000)
 
 # FastAPI for receiving data
 app = FastAPI()
-
 
 class PosData(BaseModel):
     start_fen: str
@@ -40,8 +39,7 @@ class PosData(BaseModel):
     end_fen: str
     end_rating: float
 
-
-# FastAPI route
+# FastAPI route to add data to the queue
 @app.post("/")
 async def add_pos(pos: PosData):
     if data_queue.full():
@@ -59,31 +57,29 @@ async def add_pos(pos: PosData):
             "end_rating": pos.end_rating,
         }
 
+        # Put sample in the shared queue
         data_queue.put(sample)
         return {"message": "Position added to queue", "queue_size": data_queue.qsize()}
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to process position: {e}")
 
-
 class DQN(nn.Module):
     def __init__(self):
         super(DQN, self).__init__()
-        self.conv1 = nn.Conv2d(board_depth, 32, kernel_size=3, stride=1, padding=1)
-        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1)
-        self.fc1 = nn.Linear(64 * 8 * 8, 512)
-        self.fc2 = nn.Linear(512, 256)
-        self.fc3 = nn.Linear(256, action_size)
+        self.fc1 = nn.Linear(8, 768)
+        self.fc2 = nn.Linear(768,64)
+        self.fc3 = nn.Linear(64, 512)
+        self.fc4 = nn.Linear(512, 256)
+        self.fc5 = nn.Linear(256, 128)
+        self.fc6 = nn.Linear(128, action_size)
 
     def forward(self, x):
-        x = torch.relu(self.conv1(x))
-        x = torch.max_pool2d(x, 2)
-        x = torch.relu(self.conv2(x))
-        x = torch.max_pool2d(x, 2)
-        x = x.view(x.size(0), -1)
         x = torch.relu(self.fc1(x))
         x = torch.relu(self.fc2(x))
-        return self.fc3(x)
-
+        x = torch.relu(self.fc3(x))
+        x = torch.relu(self.fc4(x))
+        x = torch.relu(self.fc5(x))
+        return self.fc6(x)
 
 def fen_to_tensor(fen: str) -> torch.Tensor:
     piece_map = {
@@ -107,7 +103,20 @@ def fen_to_tensor(fen: str) -> torch.Tensor:
     except Exception as e:
         raise ValueError(f"Invalid FEN string: {e}")
 
+# Action map to convert string actions to integer indices
+action_map = {
+    "e2e4": 0, "e2e5": 1, "d2d4": 2,  # example action mappings
+    # Add other possible actions here
+}
 
+# Function to get the action index, adding it if it's not already in the map
+def get_action_index(action):
+    if action not in action_map:
+        # Assign a new index for the new action
+        action_map[action] = len(action_map)
+    return action_map[action]
+
+# Training loop:
 def train(model: nn.Module, optimizer, criterion, training_data: List[dict]):
     global epsilon
     for epoch in range(epochs):
@@ -118,10 +127,12 @@ def train(model: nn.Module, optimizer, criterion, training_data: List[dict]):
         for i in range(0, len(training_data), batch_size):
             batch = training_data[i:i + batch_size]
 
-            states = torch.stack([torch.tensor(data["start_tensor"]) for data in batch])
-            next_states = torch.stack([torch.tensor(data["end_tensor"]) for data in batch])
+            states = torch.stack([data["start_tensor"].clone().detach() for data in batch])
+            next_states = torch.stack([data["end_tensor"].clone().detach() for data in batch])
             rewards = torch.tensor([data["end_rating"] - data["start_rating"] for data in batch], dtype=torch.float32)
-            actions = torch.tensor([data["action"] for data in batch], dtype=torch.long)
+
+            # Convert actions from string to integer index, dynamically adding new actions
+            actions = torch.tensor([get_action_index(data["action"]) for data in batch], dtype=torch.long)
 
             q_values = model(states)
             next_q_values = model(next_states)
@@ -139,23 +150,31 @@ def train(model: nn.Module, optimizer, criterion, training_data: List[dict]):
         logging.info(f"Epoch {epoch}/{epochs}, Loss: {batch_loss}")
 
 
-def training_work():
+# Background training loop
+async def training_loop():
     logging.basicConfig(level=logging.INFO)
     model = DQN()
     optimizer = optim.RMSprop(model.parameters(), lr=lr)
     criterion = nn.MSELoss()
 
-    while 1==1:
-        if data_queue.qsize() >= 1100:
-            training_data = [data_queue.get() for _ in range(1100)]
+    while True:
+        queue_size = data_queue.qsize()  # Capture the queue size at the start of the loop
+        if queue_size >= 4:
+            # Get a batch of data for training
+            training_data = [data_queue.get() for _ in range(4)]
             train(model, optimizer, criterion, training_data)
             logging.info("Batch processed. Waiting for more data...")
         else:
-            print(f"Queue size: {data_queue.qsize()}. Waiting for more data...")
-            logging.info(f"Queue size: {data_queue.qsize()}. Waiting for more data...")
-            time.sleep(2)
+            # Print and log the current queue size continuously
+            print(f"Queue size: {queue_size}. Waiting for more data...")
+            logging.info(f"Queue size: {queue_size}. Waiting for more data...")
 
+        await sleep(0.7)  # Sleep for a short time before rechecking the queue size
+
+@app.on_event("startup")
+async def start_training():
+    # Start the training loop in the background when the FastAPI server starts
+    create_task(training_loop())
 
 if __name__ == "__main__":
-    threading.Thread(target=training_work, daemon=True).start()
-    training_work()
+    uvicorn.run(app, host="0.0.0.0", port=8000)
