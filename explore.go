@@ -11,6 +11,14 @@ import (
 	"github.com/notnil/chess"
 )
 
+type PosData struct {
+	StartFen    string  `json:"start_fen"`
+	StartRating float64 `json:"start_rating"`
+	Action      string  `json:"action"`
+	EndFen      string  `json:"end_fen"`
+	EndRating   float64 `json:"end_rating"`
+}
+
 const maxWorkers = 10
 
 func exploreMoves(game *chess.Game, depth int, wg *sync.WaitGroup, pool chan struct{}, done chan struct{}) {
@@ -42,6 +50,7 @@ func exploreMoves(game *chess.Game, depth int, wg *sync.WaitGroup, pool chan str
 				wgDepth.Done()
 			}()
 
+			//Stockfish connection / interaction
 			socketPath := "ws://localhost:4000"
 			u, err := url.Parse(socketPath)
 			if err != nil {
@@ -64,15 +73,15 @@ func exploreMoves(game *chess.Game, depth int, wg *sync.WaitGroup, pool chan str
 			}
 			conn.Close()
 
-			data := map[string]interface{}{
-				"StartFen":    startfen,
-				"StartRating": startrating,
-				"Action":      move.String(),
-				"EndFen":      endfen,
-				"EndRating":   endrating,
+			data := PosData{
+				StartFen:    startfen,
+				StartRating: startrating,
+				Action:      move.String(),
+				EndFen:      endfen,
+				EndRating:   endrating,
 			}
 
-			sendJSON("urlforDQNPOD", data)
+			sendJSON("http://127.0.0.1:8000/", data)
 			// Send data to DQN or handle further as needed
 			// Update pod name in redis with fen string and depth in case of crash
 			// Here you would send `data` to your DQN for training
@@ -89,13 +98,15 @@ func exploreMoves(game *chess.Game, depth int, wg *sync.WaitGroup, pool chan str
 	}()
 }
 
-func fmain() {
+func main() {
 	var moveIndex int
 	flag.IntVar(&moveIndex, "move", 0, "Index of the opening move / pod number")
 	flag.Parse()
 
 	if moveIndex < 0 || moveIndex > 19 {
-		log.Fatalf("INVALID INDEX: %d", moveIndex)
+		// log.Fatalf("INVALID INDEX: %d", moveIndex)
+		moveIndex = 0
+
 	}
 
 	game := chess.NewGame()
@@ -112,21 +123,19 @@ func fmain() {
 	endfen := position.String()
 
 	socketPath := "ws://10.0.0.112:4000"
-	u, err := url.Parse(socketPath)
-	conn, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
+	u, _ := url.Parse(socketPath)
+	conn, _, _ := websocket.DefaultDialer.Dial(u.String(), nil)
 	rating, _ := processFen(conn, endfen)
 	conn.Close()
 
-	data := map[string]interface{}{
-		"StartFen":    startfen,
-		"StartRating": 0.0,
-		"Action":      moves[moveIndex].String(),
-		"EndFen":      endfen,
-		"EndRating":   rating,
+	data := PosData{
+		StartFen:    startfen,
+		StartRating: 1500,
+		Action:      moves[moveIndex].String(),
+		EndFen:      endfen,
+		EndRating:   float64(rating),
 	}
-	sendJSON("10.0.0.112:6789", data)
-
-	//send to dqn
+	sendJSON("http://127.0.0.1:8000/", data)
 
 	pool := make(chan struct{}, maxWorkers)
 	done := make(chan struct{}) // Channel to signal when depth is done

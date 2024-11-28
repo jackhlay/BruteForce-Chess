@@ -127,6 +127,6 @@ func listen() {
 	}
 }
 
-func main() {
+func APImain() {
 	listen()
 }

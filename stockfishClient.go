@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -15,11 +16,18 @@ import (
 
 var hostString = "localhost:4000" //Hits the container, and gets logged. Container ignores the input though...
 
-var (
+type EngineConf struct {
 	isEngineReady   bool
-	socketPath      = fmt.Sprint("ws://%s", hostString)
-	evaluationScore string // This variable will hold the evaluation score
-)
+	socketPath      string
+	evaluationScore float64
+}
+
+var engineConf = EngineConf{
+	isEngineReady:   false,
+	socketPath:      fmt.Sprint("ws://%s", hostString),
+	evaluationScore: math.NaN(), // This variable will hold the evaluation score,
+
+}
 
 type Message struct {
 	Type    string `json:"type"`
@@ -79,7 +87,7 @@ func handleMessage(message []byte) {
 		payload := eventData["payload"].(string)
 		log.Println("<< uci:response", payload)
 		if payload == "readyok" {
-			isEngineReady = true
+			engineConf.isEngineReady = true
 		}
 		if strings.Contains(payload, "depth 14") {
 			re := regexp.MustCompile("score cp (-?\\d+)")
@@ -88,7 +96,8 @@ func handleMessage(message []byte) {
 			if match != nil {
 				fmt.Printf("Matched Score: %s\n", match[1])
 				scor, _ := strconv.Atoi((match[1]))
-				evaluationScore = fmt.Sprintf("%.2f", float32(scor)/100)
+				engineConf.evaluationScore = float64(scor) / 100
+				return
 			}
 
 		}
@@ -96,14 +105,13 @@ func handleMessage(message []byte) {
 }
 
 // processFen processes the FEN string and returns the evaluation score.
-func processFen(conn *websocket.Conn, fen string) (string, error) {
+func processFen(conn *websocket.Conn, fen string) (float64, error) {
 	// Wait for the engine to be ready before sending any commands
 	// if err := waitForEngineToBeReady(conn); err != nil {
 	// 	return "", err
 	// }
 
 	sendCommand(conn, "ucinewgame")
-	updateChessboard(fen)
 
 	log.Println("Looking for evaluation score (depth=14)...")
 	uciCommands := []string{
@@ -119,16 +127,16 @@ func processFen(conn *websocket.Conn, fen string) (string, error) {
 
 	// Wait for the evaluation score from Stockfish
 	timeout := time.After(30 * time.Second)
-	for evaluationScore == "" {
+	for math.IsNaN(engineConf.evaluationScore) {
 		select {
 		case <-timeout:
-			return "", fmt.Errorf("Timeout waiting for evaluation score")
+			return -9999.9, fmt.Errorf("timeout waiting for evaluation score")
 		case <-time.After(100 * time.Millisecond): // Sleep briefly to avoid busy waiting
 			continue
 		}
 	}
 
-	return evaluationScore, nil
+	return engineConf.evaluationScore, nil
 }
 
 // sendCommand sends a command to the Stockfish engine.
@@ -170,17 +178,11 @@ func waitForEngineToBeReady(conn *websocket.Conn) error {
 			if eventData["type"] == "uci:response" {
 				payload := eventData["payload"].(string)
 				if payload == "readyok" {
-					isEngineReady = true
+					engineConf.isEngineReady = true
 					log.Println("Engine is ready")
 					return nil
 				}
 			}
 		}
 	}
-}
-
-// updateChessboard simulates updating the chessboard with the FEN string.
-func updateChessboard(fen string) {
-	// Update your chessboard logic here
-	log.Printf("Chessboard updated with FEN: %s", fen)
 }
