@@ -159,9 +159,9 @@ async def training_loop():
 
     while True:
         queue_size = data_queue.qsize()  # Capture the queue size at the start of the loop
-        if queue_size >= 4:
+        if queue_size >= 300:
             # Get a batch of data for training
-            training_data = [data_queue.get() for _ in range(4)]
+            training_data = [data_queue.get() for _ in range(300)]
             train(model, optimizer, criterion, training_data)
             logging.info("Batch processed. Waiting for more data...")
         else:

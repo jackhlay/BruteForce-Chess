@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"math"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -14,7 +13,7 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-var hostString = "localhost:4000" //Hits the container, and gets logged. Container ignores the input though...
+var hostString = "localhost:4000"
 
 type EngineConf struct {
 	isEngineReady   bool
@@ -25,8 +24,7 @@ type EngineConf struct {
 var engineConf = EngineConf{
 	isEngineReady:   false,
 	socketPath:      fmt.Sprintf("ws://%s", hostString),
-	evaluationScore: math.NaN(), // This variable will hold the evaluation score,
-
+	evaluationScore: 0.0,
 }
 
 type Message struct {
@@ -36,7 +34,7 @@ type Message struct {
 }
 
 // clientMain initializes the WebSocket connection and starts the process.
-func SFmain() {
+func sfEval(fen string) float64 {
 	u := url.URL{Scheme: "ws", Host: hostString, Path: "/"}
 	fmt.Println("Connecting to", u.String())
 
@@ -47,65 +45,83 @@ func SFmain() {
 	time.Sleep(time.Millisecond * 700)
 	defer conn.Close()
 
-	go listenForMessages(conn)
+	scoreChan := make(chan float64)
+	errChan := make(chan error)
 
-	// Example to start the process
-	fen := "3b2K1/6pp/3B4/5b2/3krP1n/q2p4/2p5/8 w - - 0 1" // Replace with your actual FEN string
-	evaluation, err := processFen(conn, fen)
-	if err != nil {
+	go listenForMessages(conn, scoreChan, errChan)
+
+	// Example to start the proces
+	println(fen)
+	// fens := "3b2K1/6pp/3B4/5b2/3krP1n/q2p4/2p5/8 w - - 0 1" // Replace with your actual FEN string
+	if err := processFen(conn, fen, scoreChan, errChan); err != nil {
 		log.Fatal("Error processing FEN:", err)
 	}
 
-	// Print the evaluation score
-	fmt.Println("Evaluation Score:", evaluation)
+	select {
+	case score := <-scoreChan:
+		fmt.Println("Evaluation score:", score)
+		return score
+	case err := <-errChan:
+		log.Println("Error:", err)
+		return -9999.9
+	}
 }
 
 // listenForMessages continuously listens for messages from Stockfish.
-func listenForMessages(conn *websocket.Conn) {
+func listenForMessages(conn *websocket.Conn, scoreChan chan float64, errChan chan error) {
 	for {
 		_, message, err := conn.ReadMessage()
 		if err != nil {
 			log.Println("Read error:", err)
 			return
 		}
-		handleMessage(message)
+		score, err := handleMessage(message)
+		if err != nil {
+			errChan <- err
+		} else if score != nil {
+			scoreChan <- *score
+		}
 	}
 }
 
-// handleMessage processes incoming messages from the Stockfish engine.
-func handleMessage(message []byte) {
+// handleMessage extracts the evaluation score from incoming messages.
+func handleMessage(message []byte) (*float64, error) {
 	var eventData map[string]interface{}
 	if err := json.Unmarshal(message, &eventData); err != nil {
-		log.Println("Unmarshal error:", err)
-		return
+		return nil, fmt.Errorf("unmarshal error: %w", err)
 	}
 
 	fmt.Printf("Received message: %s\n", message)
 
-	switch eventData["type"] {
-	case "uci:response":
+	if eventData["type"] == "uci:response" {
 		payload := eventData["payload"].(string)
 		log.Println("<< uci:response", payload)
+
+		// Check for "readyok"
 		if payload == "readyok" {
 			engineConf.isEngineReady = true
+			return nil, nil
 		}
-		if strings.Contains(payload, "depth 14") {
-			re := regexp.MustCompile("score cp (-?\\d+)")
 
+		// Extract score
+		if strings.Contains(payload, "depth 8") {
+			re := regexp.MustCompile(`score cp (-?\d+)`)
 			match := re.FindStringSubmatch(payload)
 			if match != nil {
-				fmt.Printf("Matched Score: %s\n", match[1])
-				scor, _ := strconv.Atoi((match[1]))
-				engineConf.evaluationScore = float64(scor) / 100
-				return
+				score, err := strconv.Atoi(match[1])
+				if err != nil {
+					return nil, fmt.Errorf("invalid score format: %w", err)
+				}
+				scoreFloat := float64(score)
+				return &scoreFloat, nil
 			}
-
 		}
 	}
+	return nil, nil
 }
 
 // processFen processes the FEN string and returns the evaluation score.
-func processFen(conn *websocket.Conn, fen string) (float64, error) {
+func processFen(conn *websocket.Conn, fen string, scoreChan chan float64, errChan chan error) error {
 	// Wait for the engine to be ready before sending any commands
 	// if err := waitForEngineToBeReady(conn); err != nil {
 	// 	return -1.0, err
@@ -113,9 +129,9 @@ func processFen(conn *websocket.Conn, fen string) (float64, error) {
 
 	sendCommand(conn, "ucinewgame")
 
-	log.Println("Looking for evaluation score (depth=14)...")
+	log.Println("Looking for evaluation score (depth=8)...")
 	uciCommands := []string{
-		fmt.Sprintf("position fen %s", fen),
+		fmt.Sprintf("ucinewgame", "position fen %s", fen),
 		"go depth 8",
 	}
 
@@ -123,20 +139,9 @@ func processFen(conn *websocket.Conn, fen string) (float64, error) {
 	for _, cmd := range uciCommands {
 		log.Println(">> uci:command", cmd)
 		sendCommand(conn, cmd)
+		time.Sleep(17 * time.Millisecond) // Sleep briefly to avoid busy waiting
 	}
-
-	// Wait for the evaluation score from Stockfish
-	timeout := time.After(30 * time.Second)
-	for math.IsNaN(engineConf.evaluationScore) {
-		select {
-		case <-timeout:
-			return -9999.9, fmt.Errorf("timeout waiting for evaluation score")
-		case <-time.After(100 * time.Millisecond): // Sleep briefly to avoid busy waiting
-			continue
-		}
-	}
-
-	return engineConf.evaluationScore, nil
+	return nil
 }
 
 // sendCommand sends a command to the Stockfish engine.
@@ -174,14 +179,9 @@ func waitForEngineToBeReady(conn *websocket.Conn) error {
 				continue
 			}
 
-			// Check for the readyok message
-			if eventData["type"] == "uci:response" {
-				payload := eventData["payload"].(string)
-				if payload == "readyok" {
-					engineConf.isEngineReady = true
-					log.Println("Engine is ready")
-					return nil
-				}
+			if strings.Contains(string(message), "readyok") {
+				engineConf.isEngineReady = true
+				return nil
 			}
 		}
 	}
