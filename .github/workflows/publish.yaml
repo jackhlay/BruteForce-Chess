@@ -23,13 +23,17 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      # Debug: List repository files
+      - name: List repository files
+        run: ls -R
+
       # Build and push the DQN Docker image
       - name: Build and push DQN Image
         uses: docker/build-push-action@v6.10.0
         with:
-          context: ./Python
+          context: .  # Updated path
           push: true
-          file: Dockerfile
+          file: Python/Dockerfile  # Adjust if Dockerfile is in Python folder
           tags: ${{ secrets.DOCKER_USERNAME }}/chessdqn:${{ github.sha }}
 
       # Build and push the Crawler Docker image
