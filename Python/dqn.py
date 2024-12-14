@@ -28,7 +28,7 @@ board_size = 8
 action_size = 300  # Example action size
 
 # Global Data queue for storing samples (shared across FastAPI app and training loop)
-data_queue = Queue(maxsize=7000)
+data_queue = Queue(maxsize=16384)
 
 # FastAPI for receiving data
 app = FastAPI()

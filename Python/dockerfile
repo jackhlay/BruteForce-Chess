@@ -2,8 +2,6 @@ FROM python:3.12.8-slim-bullseye
 
 WORKDIR /app
 
-COPY . .
-
 COPY *.py ./
 COPY *.txt ./
 
