@@ -91,8 +91,6 @@ func main() {
 	endfen := position.String()
 	endRating := sfEval(endfen)
 
-	// rating := sfEval(endfen)
-
 	data := PosData{
 		StartFen:    startfen,
 		StartRating: 0,

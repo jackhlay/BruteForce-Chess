@@ -12,4 +12,4 @@ RUN go build -o Crawler
 
 EXPOSE 3000
 
-cmd ["./Crawler -move= 17"]
+CMD ["./Crawler"]
