@@ -8,8 +8,9 @@ on:
 env:
   DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
   DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-  DOCKERHUB_REPOSITORY: ${{ secrets.DOCKER_USERNAME }}/chesscrawler
-  DOCKER_IMAGE_TAG: ${{ github.sha }}
+  DOCKERHUB_REPOSITORY: ${{ secrets.DOCKER_USERNAME }}/chess
+  DQN_DOCKER_IMAGE_TAG: dqn:${{ github.sha }}
+  CRAWLER_DOCKER_IMAGE_TAG: crawler:${{ github.sha }}
 
 jobs:
   build:
@@ -46,7 +47,7 @@ jobs:
           context: .
           push: true
           file: Dockerfile
-          tags: ${{ env.DOCKERHUB_REPOSITORY }}:${{ env.DOCKER_IMAGE_TAG }}
+          tags: ${{ env.DOCKERHUB_REPOSITORY }}:${{ env.CRAWLER_DOCKER_IMAGE_TAG }}
 
       # Step 6: Build and push the DQN Docker image
       - name: Build and push DQN Image
@@ -55,4 +56,4 @@ jobs:
           context: ./Python
           push: true
           file: Python/Dockerfile  # Adjust if Dockerfile is in Python folder
-          tags: ${{ secrets.DOCKER_USERNAME }}/chessdqn:${{ github.sha }}
+          tags: ${{ env.DOCKERHUB_REPOSITORY }}:${{ env.DQN_DOCKER_IMAGE_TAG }}
