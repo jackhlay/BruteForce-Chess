@@ -27,7 +27,7 @@ jobs:
       - name: Build and push DQN Image
         uses: docker/build-push-action@v6.10.0
         with:
-          context: ./Python  # Ensure the Python folder exists in the repo root
+          context: ../../Python  # Ensure the Python folder exists in the repo root
           push: true
           file: Dockerfile
           tags: ${{ secrets.DOCKER_USERNAME }}/chessdqn:${{ github.sha }}
@@ -36,7 +36,7 @@ jobs:
       - name: Build and push Crawler Image
         uses: docker/build-push-action@v6.10.0
         with:
-          context: .         # Root context for the repo
+          context: ../../         # Root context for the repo
           push: true
           file: Dockerfile
           tags: ${{ secrets.DOCKER_USERNAME }}/chesscrawler:${{ github.sha }}
