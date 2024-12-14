@@ -4,10 +4,10 @@ WORKDIR /app
 
 COPY . .
 
-COPY dqn.py ./dqn.py
-COPY reqs.txt ./reqs.txt
+COPY *.py ./
+COPY *.txt ./
 
-RUN pip install -r /reqs.txt
+RUN pip install -r reqs.txt
 
 EXPOSE 8000
 
