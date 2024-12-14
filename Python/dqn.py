@@ -152,12 +152,18 @@ def train(model: nn.Module, optimizer, criterion, training_data: List[dict]):
 
 # Background training loop
 async def training_loop():
+    idles = 0
     logging.basicConfig(level=logging.INFO)
     model = DQN()
     optimizer = optim.RMSprop(model.parameters(), lr=lr)
     criterion = nn.MSELoss()
 
     while True:
+        if idles > 10:
+            logging.info("Queue is idle for too long. Exiting training loop...")
+            return False
+
+
         queue_size = data_queue.qsize()  # Capture the queue size at the start of the loop
         if queue_size >= 300:
             # Get a batch of data for training
@@ -169,7 +175,11 @@ async def training_loop():
             print(f"Queue size: {queue_size}. Waiting for more data...")
             logging.info(f"Queue size: {queue_size}. Waiting for more data...")
 
+        preSize = data_queue.qsize()
         await sleep(0.7)  # Sleep for a short time before rechecking the queue size
+        if preSize == data_queue.qsize():
+            await sleep(2)
+            idles += 1
 
 @app.on_event("startup")
 async def start_training():

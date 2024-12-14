@@ -1,0 +1,12 @@
+FROM python:3.12.8-slim-bullseye
+
+WORKDIR /app
+
+COPY dqn.py .
+COPY requirements.txt .
+
+RUN pip install -r requirements.txt
+
+EXPOSE 8000
+
+CMD ["python", "dqn.py"]

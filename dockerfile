@@ -1,39 +1,15 @@
-FROM node:20-bullseye-slim
+FROM golang:1.22.0-alpine3.13
 
-ARG ARCH=x86-64-bmi2
-
-ENV API_TOKEN=
-ENV PORT=4000
-
-# Install OS dependencies
-RUN apt-get update
-RUN apt-get install -y \
-  build-essential \
-  make \
-  net-tools \
-  wget
-
-# Download Stockfish
-WORKDIR /tmp
-RUN wget https://github.com/official-stockfish/Stockfish/archive/refs/tags/sf_15.1.tar.gz
-RUN tar -xf ./sf_15.1.tar.gz
-
-# Install Stockfish
-WORKDIR /tmp/Stockfish-sf_15.1/src
-RUN make net
-RUN make build ARCH=${ARCH}
-RUN make install
-WORKDIR /
-RUN rm -Rf /tmp
-
-# Setup server
 WORKDIR /app
-COPY ./server/index.mjs /app/index.mjs
-COPY ./server/package-lock.json /app/package-lock.json
-COPY ./server/package.json /app/package.json
-RUN npm ci
 
-EXPOSE 4000
+COPY go.mod go.sum ./
 
+RUN go mod tidy && go mod download
 
-ENTRYPOINT ["npm", "start"]
+COPY . .
+
+RUN go build -o Crawler
+
+EXPOSE 3000
+
+cmd ["./Crawler -move= 17"]
