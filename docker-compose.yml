@@ -1,0 +1,34 @@
+version: '1.0.0'
+services:
+  stockfish:
+    image: ivangabrielle/dockfish:latest
+    container_name: stockfish
+    ports:
+      - "4000:4000"
+    networks:
+      - chess-network
+
+  chesscrawler:
+    image: jackhlay/chesscrawler:latest
+    container_name: chesscrawler
+    ports:
+      - "3000:3000"
+    depends_on:
+      - stockfish
+    networks:
+      - chess-network
+
+  chessdqn:
+    image: jackhlay/chessdqn:latest
+    container_name: chessdqn
+    ports:
+      - "8000:8000"
+    depends_on:
+      - stockfish
+      - chesscrawler
+    networks:
+      - chess-network
+
+networks:
+  chess-network:
+    driver: bridge
