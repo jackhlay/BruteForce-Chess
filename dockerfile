@@ -4,8 +4,6 @@ WORKDIR /app
 
 COPY go.mod go.sum ./
 
-RUN go get
-
 RUN go mod tidy && go mod download
 
 COPY *.go ./
