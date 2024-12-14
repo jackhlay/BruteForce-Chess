@@ -41,10 +41,10 @@ jobs:
           tags: ${{ secrets.DOCKER_USERNAME }}/chesscrawler:${{ github.sha }}
 
       # Build and push the DQN Docker image
-            - name: Build and push DQN Image
-              uses: docker/build-push-action@v6.10.0
-              with:
-                context: ./Python
-                push: true
-                file: Python/Dockerfile  # Adjust if Dockerfile is in Python folder
-                tags: ${{ secrets.DOCKER_USERNAME }}/chessdqn:${{ github.sha }}
+      - name: Build and push DQN Image
+        uses: docker/build-push-action@v6.10.0
+        with:
+          context: ./Python
+          push: true
+          file: Python/Dockerfile  # Adjust if Dockerfile is in Python folder
+          tags: ${{ secrets.DOCKER_USERNAME }}/chessdqn:${{ github.sha }}
