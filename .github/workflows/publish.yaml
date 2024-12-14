@@ -9,8 +9,8 @@ env:
   DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
   DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
   DOCKERHUB_REPOSITORY: ${{ secrets.DOCKER_USERNAME }}/chess
-  DQN_DOCKER_IMAGE_TAG: dqn:${{ github.sha }}
-  CRAWLER_DOCKER_IMAGE_TAG: crawler:${{ github.sha }}
+  DQN_DOCKER_IMAGE_TAG: dqn-${{ github.sha }}
+  CRAWLER_DOCKER_IMAGE_TAG: crawler-${{ github.sha }}
 
 jobs:
   build:
