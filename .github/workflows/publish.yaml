@@ -10,7 +10,7 @@ jobs:
     steps:
       # Step 1: Check out the repository
       - name: Check out repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       # Log in to Docker Hub
       - name: Log in to Docker Hub
