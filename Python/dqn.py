@@ -1,4 +1,5 @@
 import time
+import sys
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -159,11 +160,6 @@ async def training_loop():
     criterion = nn.MSELoss()
 
     while True:
-        if idles > 10:
-            logging.info("Queue is idle for too long. Exiting training loop...")
-            return False
-
-
         queue_size = data_queue.qsize()  # Capture the queue size at the start of the loop
         if queue_size >= 300:
             # Get a batch of data for training
@@ -172,13 +168,10 @@ async def training_loop():
             logging.info("Batch processed. Waiting for more data...")
         else:
             # Print and log the current queue size continuously
-            print(f"Queue size: {queue_size}. Waiting for more data...")
-            logging.info(f"Queue size: {queue_size}. Waiting for more data...")
+            logging.info(f"Queue size: {queue_size}. Idles: {idles}. Waiting for more data...")
 
-        preSize = data_queue.qsize()
-        await sleep(0.7)  # Sleep for a short time before rechecking the queue size
-        if preSize == data_queue.qsize():
-            await sleep(2)
+        await sleep(1.73)  # Sleep for a short time before rechecking the queue size
+        if queue_size == data_queue.qsize():
             idles += 1
 
 @app.on_event("startup")
