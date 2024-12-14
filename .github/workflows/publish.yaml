@@ -30,7 +30,7 @@ jobs:
           context: ./Python  # Ensure the Python folder exists in the repo root
           push: true
           file: Dockerfile
-          tags: ${{ secrets.DOCKER_USERNAME }}/chessDQN:${{ github.sha }}
+          tags: ${{ secrets.DOCKER_USERNAME }}/chessdqn:${{ github.sha }}
 
       # Build and push the Crawler Docker image
       - name: Build and push Crawler Image
@@ -39,4 +39,4 @@ jobs:
           context: .         # Root context for the repo
           push: true
           file: Dockerfile
-          tags: ${{ secrets.DOCKER_USERNAME }}/chessCrawler:${{ github.sha }}
+          tags: ${{ secrets.DOCKER_USERNAME }}/chesscrawler:${{ github.sha }}
