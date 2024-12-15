@@ -6,6 +6,7 @@ import (
 	"log"
 	"sync"
 
+	"github.com/gorilla/websocket"
 	"github.com/notnil/chess"
 )
 
@@ -17,37 +18,36 @@ type PosData struct {
 	EndRating   float64 `json:"end_rating"`
 }
 
-const maxWorkers = 4
+const maxWorkers = 8
 
-func exploreMoves(game *chess.Game, depth int, wg *sync.WaitGroup, pool chan struct{}) {
+func exploreMoves(pos *chess.Position, depth int, wg *sync.WaitGroup, pool chan struct{}, conn *websocket.Conn) {
 	defer wg.Done()
-	fmt.Printf("ROUND %d\n", 17-depth)
 
 	if depth == 0 {
 		return
 	}
 
-	legalMoves := game.Position().ValidMoves()
-
+	legalMoves := pos.ValidMoves()
 	for _, move := range legalMoves {
-		useGame := game.Clone()
-		startfen := useGame.Position().String()
-		err := useGame.Move(move)
-		if err != nil {
-			log.Fatalf("Error making move: %v", err)
-		}
-		endfen := useGame.Position().String()
-		endRating := sfEval(endfen)
-		startRating := sfEval(startfen)
-
 		pool <- struct{}{} // Acquire worker slot
 		wg.Add(1)
 
-		go func(game *chess.Game, depth int, startfen, endfen string) {
+		go func(move *chess.Move, Pos *chess.Position) {
 			defer func() {
-				<-pool // Release the worker to the pool
+				<-pool // Release the worker slot
 				wg.Done()
+				if r := recover(); r != nil {
+					log.Printf("Recovered from panic: %v", r)
+				}
 			}()
+
+			// Clone the position to avoid data races
+			newPos := Pos.Update(move)
+
+			startfen := Pos.String()
+			endfen := newPos.String()
+			startRating := sfEval(conn, startfen)
+			endRating := sfEval(conn, endfen)
 
 			data := PosData{
 				StartFen:    startfen,
@@ -58,23 +58,23 @@ func exploreMoves(game *chess.Game, depth int, wg *sync.WaitGroup, pool chan str
 			}
 			fmt.Println(data)
 			sendJSON(data)
-			// Send data to DQN or handle further as needed
 
-			// Recurse into next depth
-			exploreMoves(game, depth-1, wg, pool)
-		}(useGame, depth-1, startfen, endfen) // Pass startfen and endfen to the goroutine
+			// Recurse into the next depth
+			exploreMoves(newPos, depth-1, wg, pool, conn)
+		}(move, pos)
 	}
 }
 
 func main() {
+	conn := GetConn()
+	defer conn.Close()
+
 	var moveIndex int
 	flag.IntVar(&moveIndex, "move", 0, "Index of the opening move / pod number")
 	flag.Parse()
 
 	if moveIndex < 0 || moveIndex > 19 {
-		// log.Fatalf("INVALID INDEX: %d", moveIndex)
 		moveIndex = 0
-
 	}
 
 	game := chess.NewGame()
@@ -89,7 +89,7 @@ func main() {
 	}
 
 	endfen := position.String()
-	endRating := sfEval(endfen)
+	endRating := sfEval(conn, endfen)
 
 	data := PosData{
 		StartFen:    startfen,
@@ -104,8 +104,9 @@ func main() {
 	var wg sync.WaitGroup
 
 	wg.Add(1)
+	pool <- struct{}{}
 
-	go exploreMoves(game, 15, &wg, pool)
+	go exploreMoves(game.Position(), 15, &wg, pool, conn)
 
 	wg.Wait()
 	fmt.Println("ALL MOVES EXPLORED")

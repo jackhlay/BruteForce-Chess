@@ -15,6 +15,10 @@ services:
       - "3000:3000"
     depends_on:
       - stockfish
+      - chessdqn
+    restart: always
+      
+        
     networks:
       - chess-network
 
@@ -23,9 +27,6 @@ services:
     container_name: chessdqn
     ports:
       - "8000:8000"
-    depends_on:
-      - stockfish
-      - chesscrawler
     networks:
       - chess-network
 

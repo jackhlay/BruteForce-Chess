@@ -33,17 +33,20 @@ type Message struct {
 	Payload string `json:"payload,omitempty"`
 }
 
-// clientMain initializes the WebSocket connection and starts the process.
-func sfEval(fen string) float64 {
+func GetConn() *websocket.Conn {
 	u := url.URL{Scheme: "ws", Host: hostString, Path: "/"}
-	fmt.Println("Connecting to", u.String())
 
 	conn, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
 	if err != nil {
 		log.Fatal("Dial error:", err)
 	}
 	time.Sleep(time.Millisecond * 700)
-	defer conn.Close()
+	return conn
+}
+
+// clientMain initializes the WebSocket connection and starts the process.
+func sfEval(conn *websocket.Conn, fen string) float64 {
+	// Connect to the Stockfish WebSocket server, passed in from GetConn()
 
 	scoreChan := make(chan float64)
 	errChan := make(chan error)
