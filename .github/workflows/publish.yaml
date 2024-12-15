@@ -10,7 +10,7 @@ env:
   DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
   DQN_DOCKERHUB_REPOSITORY: ${{ secrets.DOCKER_USERNAME }}/chessdqn
   CRAWLER_DOCKERHUB_REPOSITORY: ${{ secrets.DOCKER_USERNAME }}/chesscrawler
-  DOCKER_IMAGE_TAG: latest
+  DOCKER_IMAGE_TAG: dev
 
 jobs:
   build:

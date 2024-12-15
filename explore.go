@@ -6,7 +6,6 @@ import (
 	"log"
 	"sync"
 
-	"github.com/gorilla/websocket"
 	"github.com/notnil/chess"
 )
 
@@ -18,21 +17,20 @@ type PosData struct {
 	EndRating   float64 `json:"end_rating"`
 }
 
+type Work struct {
+	pos    *chess.Position
+	move   string
+	depth  int
+	parent *Work
+}
+
 const maxWorkers = 8
 
-func exploreMoves(pos *chess.Position, depth int, wg *sync.WaitGroup, pool chan struct{}, conn *websocket.Conn) {
-	defer wg.Done()
-
-	if depth == 0 {
-		return
-	}
-
-	legalMoves := pos.ValidMoves()
-	for _, move := range legalMoves {
+func worker(workQueue chan Work, pool chan struct{}, wg *sync.WaitGroup) {
+	for work := range workQueue {
 		pool <- struct{}{} // Acquire worker slot
 		wg.Add(1)
-
-		go func(move *chess.Move, Pos *chess.Position) {
+		go func(work Work) {
 			defer func() {
 				<-pool // Release the worker slot
 				wg.Done()
@@ -41,18 +39,15 @@ func exploreMoves(pos *chess.Position, depth int, wg *sync.WaitGroup, pool chan 
 				}
 			}()
 
-			// Clone the position to avoid data races
-			newPos := Pos.Update(move)
-
-			startfen := Pos.String()
-			endfen := newPos.String()
+			startfen := work.pos.String()
+			endfen := work.pos.String()
 			startRating := sfEval(startfen)
 			endRating := sfEval(endfen)
 
 			data := PosData{
 				StartFen:    startfen,
 				StartRating: startRating,
-				Action:      move.String(),
+				Action:      work.move, // Update with actual move
 				EndFen:      endfen,
 				EndRating:   endRating,
 			}
@@ -60,14 +55,29 @@ func exploreMoves(pos *chess.Position, depth int, wg *sync.WaitGroup, pool chan 
 			sendJSON(data)
 
 			// Recurse into the next depth
-			exploreMoves(newPos, depth-1, wg, pool, conn)
-		}(move, pos)
+			exploreMoves(work.pos, work.depth, wg, workQueue)
+		}(work)
+	}
+}
+
+func exploreMoves(pos *chess.Position, depth int, wg *sync.WaitGroup, workQueue chan Work) {
+	defer wg.Done()
+
+	if depth == 0 {
+		return
+	}
+
+	legalMoves := pos.ValidMoves()
+	for _, move := range legalMoves {
+		newPos := pos.Update(move)
+		wg.Add(1)
+		moveStr := move.String()
+		workQueue <- Work{newPos, moveStr, depth - 1, nil}
 	}
 }
 
 func main() {
-	conn := GetConn()
-	defer conn.Close()
+	workQueue := make(chan Work, 1024)
 
 	var moveIndex int
 	flag.IntVar(&moveIndex, "move", 0, "Index of the opening move / pod number")
@@ -103,11 +113,17 @@ func main() {
 	pool := make(chan struct{}, maxWorkers)
 	var wg sync.WaitGroup
 
-	wg.Add(1)
-	pool <- struct{}{}
+	for i := 0; i < maxWorkers; i++ {
+		go worker(workQueue, pool, &wg)
+	}
 
-	go exploreMoves(game.Position(), 15, &wg, pool, conn)
+	wg.Add(1)
+	workQueue <- Work{game.Position(), "", 15, nil}
 
 	wg.Wait()
+	go exploreMoves(game.Position(), 15, &wg, workQueue)
+
+	wg.Wait()
+	close(workQueue)
 	fmt.Println("ALL MOVES EXPLORED")
 }
