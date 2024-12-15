@@ -45,9 +45,10 @@ func GetConn() *websocket.Conn {
 }
 
 // clientMain initializes the WebSocket connection and starts the process.
-func sfEval(conn *websocket.Conn, fen string) float64 {
+func sfEval(fen string) float64 {
 	// Connect to the Stockfish WebSocket server, passed in from GetConn()
-
+	conn := GetConn()
+	defer conn.Close()
 	scoreChan := make(chan float64)
 	errChan := make(chan error)
 

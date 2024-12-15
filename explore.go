@@ -46,8 +46,8 @@ func exploreMoves(pos *chess.Position, depth int, wg *sync.WaitGroup, pool chan 
 
 			startfen := Pos.String()
 			endfen := newPos.String()
-			startRating := sfEval(conn, startfen)
-			endRating := sfEval(conn, endfen)
+			startRating := sfEval(startfen)
+			endRating := sfEval(endfen)
 
 			data := PosData{
 				StartFen:    startfen,
@@ -89,7 +89,7 @@ func main() {
 	}
 
 	endfen := position.String()
-	endRating := sfEval(conn, endfen)
+	endRating := sfEval(endfen)
 
 	data := PosData{
 		StartFen:    startfen,

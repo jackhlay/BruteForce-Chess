@@ -5,6 +5,7 @@ services:
     container_name: stockfish
     ports:
       - "4000:4000"
+    restart: on-failure
     networks:
       - chess-network
 
@@ -16,9 +17,7 @@ services:
     depends_on:
       - stockfish
       - chessdqn
-    restart: always
-      
-        
+    restart: on-failure
     networks:
       - chess-network
 
