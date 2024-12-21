@@ -11,7 +11,7 @@ services:
       - chess-network
 
   chesscrawler:
-    image: jackhlay/chesscrawler:latest
+    image: jackhlay/chesscrawler:dev
     container_name: chesscrawler
     ports:
       - "3000:3000"
@@ -22,7 +22,7 @@ services:
       - chess-network
 
   chessdqn:
-    image: jackhlay/chessdqn:latest
+    image: jackhlay/chessdqn:dev
     container_name: chessdqn
     ports:
       - "8000:8000"

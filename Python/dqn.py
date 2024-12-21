@@ -1,18 +1,18 @@
-import time
-import sys
+# Standard library imports
+import random
+import logging
+from queue import Queue
+from typing import List
+from asyncio import create_task, sleep
+ 
+# Third-party imports
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import random
 import numpy as np
 import uvicorn
-import logging
-from queue import Queue
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from typing import List
-from asyncio import create_task, sleep
-
 # Hyperparameters
 epochs = 100
 batch_size = 100
