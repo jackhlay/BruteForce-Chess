@@ -127,9 +127,9 @@ func handleMessage(message []byte) (*float64, error) {
 // processFen processes the FEN string and returns the evaluation score.
 func processFen(conn *websocket.Conn, fen string, scoreChan chan float64, errChan chan error) error {
 	// Wait for the engine to be ready before sending any commands
-	// if err := waitForEngineToBeReady(conn); err != nil {
-	// 	return -1.0, err
-	// }
+	if err := waitForEngineToBeReady(conn); err != nil {
+		errChan <- err
+	}
 
 	sendCommand(conn, "ucinewgame")
 
@@ -154,6 +154,7 @@ func sendCommand(conn *websocket.Conn, command string) {
 		Type:    "uci:command",
 		Payload: command,
 	}
+	log.Printf("Sending command: %s", command) // Add this line for debugging
 	if err := conn.WriteJSON(cmdMsg); err != nil {
 		log.Println("WriteJSON error:", err)
 	}

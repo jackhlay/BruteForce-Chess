@@ -18,7 +18,7 @@ const wss = new WebSocketServer({ server });
 
 wss.on("connection", (ws) => {
   const stockfish = spawn("stockfish");
-  let isAuthenticated = !API_TOKEN;
+  let isAuthenticated = true
 
   stockfish.stdout.on("data", (data) => {
     const lines = data

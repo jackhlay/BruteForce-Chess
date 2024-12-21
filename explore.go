@@ -32,8 +32,6 @@ func worker(workQueue chan Work, pool chan struct{}, wg *sync.WaitGroup) {
 		wg.Add(1)
 		go func(work Work) {
 			defer func() {
-				<-pool // Release the worker slot
-				wg.Done()
 				if r := recover(); r != nil {
 					log.Printf("Recovered from panic: %v", r)
 				}
@@ -53,6 +51,9 @@ func worker(workQueue chan Work, pool chan struct{}, wg *sync.WaitGroup) {
 			}
 			fmt.Println(data)
 			sendJSON(data)
+
+			<-pool // Release the worker slot
+			wg.Done()
 
 			// Recurse into the next depth
 			exploreMoves(work.pos, work.depth, wg, workQueue)
