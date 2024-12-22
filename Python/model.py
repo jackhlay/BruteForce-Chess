@@ -1,6 +1,7 @@
 # Standard library imports
 import random
 import logging
+import pprint
 from queue import Queue
 from typing import List
 from asyncio import create_task, sleep
@@ -15,7 +16,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 # Hyperparameters
 epochs = 100
-batch_size = 300
+batch_size = 64
 epsilon = 0.1  # Exploration rate
 lr = 1e-4
 gamma = 0.99
@@ -52,6 +53,7 @@ async def add_pos(pos: PosData):
         raise HTTPException(status_code=503, detail="Queue is full. Try again later.")
 
     try:
+        pprint.pprint(pos)
         start_tensor = fen_to_tensor(pos.start_fen)
         end_tensor = fen_to_tensor(pos.end_fen)
 
@@ -118,6 +120,10 @@ def get_action_index(action):
 # Training loop:
 def train(model: nn.Module, optimizer, criterion, training_data: List[dict]):
     global epsilon
+    model.train()  # Set the model to training mode
+
+    best_loss = float('inf')
+
     for epoch in range(epochs):
         epsilon = max(min_epsilon, epsilon * epsilon_decay)
         random.shuffle(training_data)
@@ -125,6 +131,9 @@ def train(model: nn.Module, optimizer, criterion, training_data: List[dict]):
 
         for i in range(0, len(training_data), batch_size):
             batch = training_data[i:i + batch_size]
+            if len(batch) == 0:
+                print("Skipping empty batch")
+                continue  # Skip empty batches
 
             states = torch.stack([data["start_tensor"].clone().detach() for data in batch])
             next_states = torch.stack([data["end_tensor"].clone().detach() for data in batch])
@@ -136,7 +145,10 @@ def train(model: nn.Module, optimizer, criterion, training_data: List[dict]):
             q_values = model(states)
             next_q_values = model(next_states)
 
-            target_q_values = rewards + gamma * next_q_values.max(1)[0]
+            if next_q_values.size(1) == 0:
+                continue  # Skip if next_q_values is empty
+
+            target_q_values = rewards + gamma * next_q_values.max(1)[0].detach()
             q_value = q_values.gather(1, actions.unsqueeze(1)).squeeze(1)
 
             loss = criterion(q_value, target_q_values)
@@ -146,8 +158,7 @@ def train(model: nn.Module, optimizer, criterion, training_data: List[dict]):
             optimizer.step()
             batch_loss += loss.item()
 
-        logging.info(f"Epoch {epoch}/{epochs}, Loss: {batch_loss}")
-
+        logging.info(f"Epoch {epoch + 1}/{epochs}, Loss: {batch_loss:.4f}, Epsilon: {epsilon:.4f}")
 
 # Background training loop
 async def training_loop():
@@ -159,9 +170,9 @@ async def training_loop():
 
     while True:
         queue_size = data_queue.qsize()  # Capture the queue size at the start of the loop
-        if queue_size >= 300:
+        if queue_size >= batch_size:
             # Get a batch of data for training
-            training_data = [data_queue.get() for _ in range(300)]
+            training_data = [data_queue.get() for _ in range(batch_size)]
             train(model, optimizer, criterion, training_data)
             logging.info("Batch processed. Waiting for more data...")
         else:

@@ -131,7 +131,7 @@ func processFen(conn *websocket.Conn, fen string, scoreChan chan float64, errCha
 
 	log.Println("Looking for evaluation score (depth=8)...")
 	uciCommands := []string{
-		fmt.Sprintf("ucinewgame", "position fen %s", fen),
+		fmt.Sprintf("position fen %s", fen),
 		"go depth 8",
 	}
 
@@ -139,7 +139,7 @@ func processFen(conn *websocket.Conn, fen string, scoreChan chan float64, errCha
 	for _, cmd := range uciCommands {
 		log.Println(">> uci:command", cmd)
 		sendCommand(conn, cmd)
-		time.Sleep(17 * time.Millisecond) // Sleep briefly to avoid busy waiting
+		time.Sleep(11 * time.Millisecond) // Sleep briefly to avoid busy waiting
 	}
 	return nil
 }
