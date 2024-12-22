@@ -15,7 +15,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 # Hyperparameters
 epochs = 100
-batch_size = 100
+batch_size = 300
 epsilon = 0.1  # Exploration rate
 lr = 1e-4
 gamma = 0.99
@@ -25,7 +25,12 @@ min_epsilon = 0.01
 # Constants
 board_depth = 12
 board_size = 8
-action_size = 300  # Example action size
+
+# Action map to convert string actions to integer indices
+action_map = {}
+
+action_size = len(action_map)   #action size
+
 
 # Global Data queue for storing samples (shared across FastAPI app and training loop)
 data_queue = Queue(maxsize=16384)
@@ -64,23 +69,22 @@ async def add_pos(pos: PosData):
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to process position: {e}")
 
-class DQN(nn.Module):
+class CNN(nn.Module):
     def __init__(self):
-        super(DQN, self).__init__()
-        self.fc1 = nn.Linear(8, 768)
-        self.fc2 = nn.Linear(768,64)
-        self.fc3 = nn.Linear(64, 512)
-        self.fc4 = nn.Linear(512, 256)
-        self.fc5 = nn.Linear(256, 128)
-        self.fc6 = nn.Linear(128, action_size)
+        super(CNN, self).__init__()
+        self.conv1 = nn.Conv2d(12, 64, kernel_size=3, padding=1)  # Input: 12 channels
+        self.conv2 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
+        self.conv3 = nn.Conv2d(128, 256, kernel_size=3, padding=1)
+        self.fc1 = nn.Linear(256 * 8 * 8, 1024)  # Flattened from 8x8 board after convolution
+        self.fc2 = nn.Linear(1024, action_size)  # Output layer: number of actions
 
     def forward(self, x):
+        x = torch.relu(self.conv1(x))
+        x = torch.relu(self.conv2(x))
+        x = torch.relu(self.conv3(x))
+        x = x.view(x.size(0), -1)  # Flatten the tensor
         x = torch.relu(self.fc1(x))
-        x = torch.relu(self.fc2(x))
-        x = torch.relu(self.fc3(x))
-        x = torch.relu(self.fc4(x))
-        x = torch.relu(self.fc5(x))
-        return self.fc6(x)
+        return self.fc2(x)
 
 def fen_to_tensor(fen: str) -> torch.Tensor:
     piece_map = {
@@ -103,12 +107,6 @@ def fen_to_tensor(fen: str) -> torch.Tensor:
         return torch.from_numpy(tensor)
     except Exception as e:
         raise ValueError(f"Invalid FEN string: {e}")
-
-# Action map to convert string actions to integer indices
-action_map = {
-    "e2e4": 0, "e2e5": 1, "d2d4": 2,  # example action mappings
-    # Add other possible actions here
-}
 
 # Function to get the action index, adding it if it's not already in the map
 def get_action_index(action):
@@ -155,8 +153,8 @@ def train(model: nn.Module, optimizer, criterion, training_data: List[dict]):
 async def training_loop():
     idles = 0
     logging.basicConfig(level=logging.INFO)
-    model = DQN()
-    optimizer = optim.RMSprop(model.parameters(), lr=lr)
+    model = CNN()
+    optimizer = optim.Adam(model.parameters(), lr=lr)
     criterion = nn.MSELoss()
 
     while True:
@@ -176,8 +174,7 @@ async def training_loop():
 
 @app.on_event("startup")
 async def start_training():
-    # Start the training loop in the background when the FastAPI server starts
-    create_task(training_loop())
+    create_task(training_loop()) # Start the training loop in the background
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
