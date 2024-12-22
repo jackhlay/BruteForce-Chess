@@ -10,4 +10,4 @@ RUN go build -o Crawler
 
 EXPOSE 3000
 
-CMD ["./Crawler", "move=17"]
+# CMD ["./Crawler", "move=17"] # Getting rid of this to use dynamic container arguments in cluster

@@ -2,10 +2,10 @@ FROM python:3.12.8-slim-bullseye
 
 WORKDIR /app
 
-COPY *.py ./
-COPY *.txt ./
+COPY dqn.py ./
+COPY reqs.txt ./
 
-RUN pip install -r reqs.txt
+RUN pip install --no-cache-dir -r reqs.txt
 
 EXPOSE 8000
 
