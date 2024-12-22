@@ -2,7 +2,7 @@ FROM python:3.12.8-slim-bullseye
 
 WORKDIR /app
 
-COPY dqn.py ./
+COPY model.py ./
 COPY reqs.txt ./
 
 RUN pip install --no-cache-dir -r reqs.txt
