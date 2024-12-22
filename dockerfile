@@ -4,10 +4,14 @@ WORKDIR /app
 
 COPY go.mod go.sum ./
 COPY *.go ./
+COPY run.sh ./run.sh
 
 RUN go mod tidy && go mod download
 RUN go build -o Crawler
 
+# RUN chmod +x /entrypoint.sh
+# ENTRYPOINT ["/run.sh"]
+
 EXPOSE 3000
 
-# CMD ["./Crawler", "move=17"] # Getting rid of this to use dynamic container arguments in cluster
+CMD ["./Crawler", "move=17"]
