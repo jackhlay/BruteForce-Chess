@@ -1,12 +1,11 @@
-FROM python:3.12.8-slim-bullseye
+FROM 3.12.8-alpine3.21
 
 WORKDIR /app
 
-COPY model.py ./
-COPY reqs.txt ./
+COPY model.py reqs.txt ./
 
 RUN pip install --no-cache-dir -r reqs.txt
 
 EXPOSE 8000
 
-CMD ["python", "dqn.py"]
+CMD ["python", "model.py"]
