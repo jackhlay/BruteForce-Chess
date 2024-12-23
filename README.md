@@ -3,7 +3,7 @@
 ## This is a machine learning project, to try and train a DQN by brute forcing chess positions.  
   
 # Docker Images
-New Docker images are cut with every commit to main, and can be found in [DQN](https://hub.docker.com/repository/docker/jackhlay/chessdqn) & [Crawler](https://hub.docker.com/repository/docker/jackhlay/chesscrawler)  
+New Docker images are cut with every commit to main, and can be found in [CNN](https://hub.docker.com/repository/docker/jackhlay/chessdqn) & [Crawler](https://hub.docker.com/repository/docker/jackhlay/chesscrawler)  
 
 # Cluster Architechture
 See the diagram below.  
