@@ -24,7 +24,7 @@ type Work struct {
 	parent *Work
 }
 
-const maxWorkers = 8
+const maxWorkers = 2
 
 func worker(workQueue chan Work, pool chan struct{}, wg *sync.WaitGroup) {
 	for work := range workQueue {
