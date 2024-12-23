@@ -10,7 +10,7 @@ import (
 func sendJSON(data PosData) {
 	//send to dqn
 	jsonData, _ := json.Marshal(data)
-	resp, err := http.Post("http://chessdqn:8000/", "application/json", bytes.NewBuffer(jsonData))
+	resp, err := http.Post("http://10.43.72.240:8000/", "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		fmt.Println("Error Making POST req: ", err)
 	}
