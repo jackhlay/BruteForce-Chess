@@ -15,12 +15,12 @@ import uvicorn
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 # Hyperparameters
-epochs = 7
-batch_size = 64
+epochs = 20
+batch_size = 128
 epsilon = 0.1  # Exploration rate
 lr = 1e-4
 gamma = 0.99
-epsilon_decay = 0.99
+epsilon_decay = 0.995
 min_epsilon = 0.01
 
 # Constants
