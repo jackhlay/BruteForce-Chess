@@ -1,4 +1,4 @@
-module chess-ml
+module boby
 
 go 1.22.0
 

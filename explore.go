@@ -36,15 +36,18 @@ func worker(workQueue chan Work, pool chan struct{}, wg *sync.WaitGroup) {
 					log.Printf("Recovered from panic: %v", r)
 				}
 			}()
+			start := work.pos.String()
+			fen, _ := chess.FEN(start)
+			startEval := sfEval(start)
+			game := chess.NewGame(fen)
+			game.MoveStr(work.move)
 
-			startfen := work.pos.String()
-			endfen := work.pos.String()
-			startRating := sfEval(startfen)
+			endfen := game.Position().String()
 			endRating := sfEval(endfen)
 
 			data := PosData{
-				StartFen:    startfen,
-				StartRating: startRating,
+				StartFen:    start,
+				StartRating: startEval,
 				Action:      work.move, // Update with actual move
 				EndFen:      endfen,
 				EndRating:   endRating,
@@ -56,7 +59,7 @@ func worker(workQueue chan Work, pool chan struct{}, wg *sync.WaitGroup) {
 			wg.Done()
 
 			// Recurse into the next depth
-			exploreMoves(work.pos, work.depth, wg, workQueue)
+			exploreMoves(game.Position(), work.depth, wg, workQueue)
 		}(work)
 	}
 }
@@ -70,9 +73,14 @@ func exploreMoves(pos *chess.Position, depth int, wg *sync.WaitGroup, workQueue 
 
 	legalMoves := pos.ValidMoves()
 	for _, move := range legalMoves {
-		newPos := pos.Update(move)
-		wg.Add(1)
+		fen, _ := chess.FEN(pos.String())
+		newGame := chess.NewGame(fen)
+		newPos := newGame.Position()
+
 		moveStr := move.String()
+
+		// Enqueue new work
+		wg.Add(1)
 		workQueue <- Work{newPos, moveStr, depth - 1, nil}
 	}
 }

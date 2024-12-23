@@ -56,7 +56,6 @@ func sfEval(fen string) float64 {
 
 	// Example to start the proces
 	println(fen)
-	// fens := "3b2K1/6pp/3B4/5b2/3krP1n/q2p4/2p5/8 w - - 0 1" // Replace with your actual FEN string
 	if err := processFen(conn, fen, scoreChan, errChan); err != nil {
 		log.Fatal("Error processing FEN:", err)
 	}
@@ -108,7 +107,7 @@ func handleMessage(message []byte) (*float64, error) {
 		}
 
 		// Extract score
-		if strings.Contains(payload, "depth 8") {
+		if strings.Contains(payload, "depth 2") {
 			re := regexp.MustCompile(`score cp (-?\d+)`)
 			match := re.FindStringSubmatch(payload)
 			if match != nil {
@@ -129,10 +128,10 @@ func processFen(conn *websocket.Conn, fen string, scoreChan chan float64, errCha
 
 	sendCommand(conn, "ucinewgame")
 
-	log.Println("Looking for evaluation score (depth=8)...")
+	log.Println("Looking for evaluation score (depth=2)...")
 	uciCommands := []string{
 		fmt.Sprintf("position fen %s", fen),
-		"go depth 8",
+		"go depth 2",
 	}
 
 	// Send commands to Stockfish

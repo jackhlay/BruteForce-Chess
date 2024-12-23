@@ -15,7 +15,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 # Hyperparameters
-epochs = 100
+epochs = 7
 batch_size = 64
 epsilon = 0.1  # Exploration rate
 lr = 1e-4
@@ -71,23 +71,36 @@ async def add_pos(pos: PosData):
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to process position: {e}")
 
+
+# Define the CNN model
 class CNN(nn.Module):
     def __init__(self):
         super(CNN, self).__init__()
         self.conv1 = nn.Conv2d(12, 64, kernel_size=3, padding=1)  # Input: 12 channels
         self.conv2 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
         self.conv3 = nn.Conv2d(128, 256, kernel_size=3, padding=1)
-        self.fc1 = nn.Linear(256 * 8 * 8, 1024)  # Flattened from 8x8 board after convolution
-        self.fc2 = nn.Linear(1024, action_size)  # Output layer: number of actions
+        self.pool = nn.MaxPool2d(kernel_size=2, stride=2)  # Pooling layer to reduce spatial size
+        
+        # The input size of the following linear layer depends on the input image size
+        # Assuming the input image size is 64x64, we compute the output size after conv and pooling
+        # After 3 convolution layers and pooling, the image size is reduced by a factor of 2 each time (assuming kernel=2 for pooling)
+        self.fc1 = nn.Linear(256, 1024)  # Flattened size after convolution and pooling
+        
+        self.fc2 = nn.Linear(1024, 64)  # Output layer: one score per position
 
     def forward(self, x):
         x = torch.relu(self.conv1(x))
+        x = self.pool(x)  # Pool after first conv layer
         x = torch.relu(self.conv2(x))
+        x = self.pool(x)  # Pool after second conv layer
         x = torch.relu(self.conv3(x))
-        x = x.view(x.size(0), -1)  # Flatten the tensor
+        x = self.pool(x)  # Pool after third conv layer
+        
+        x = x.view(x.size(0), -1)  # Flatten the tensor before feeding into the fully connected layer
         x = torch.relu(self.fc1(x))
-        return self.fc2(x)
-
+        x = torch.relu(self.fc2(x))  # Output layer
+        return x
+    
 def fen_to_tensor(fen: str) -> torch.Tensor:
     piece_map = {
         'p': 1, 'r': 2, 'n': 3, 'b': 4, 'q': 5, 'k': 6,
@@ -166,7 +179,9 @@ async def training_loop():
     logging.basicConfig(level=logging.INFO)
     model = CNN()
     optimizer = optim.Adam(model.parameters(), lr=lr)
-    criterion = nn.MSELoss()
+    criterion = nn.L1Loss()
+
+    global epsilon
 
     while True:
         queue_size = data_queue.qsize()  # Capture the queue size at the start of the loop
