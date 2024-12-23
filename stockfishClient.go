@@ -13,7 +13,7 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-var hostString = "10.43.156.241:4000"
+var hostString = "10.0.0.112:4000"
 
 type EngineConf struct {
 	isEngineReady   bool
