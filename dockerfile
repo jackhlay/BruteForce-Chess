@@ -11,7 +11,6 @@ RUN go build -o Crawler
 
 RUN chmod +x run.sh
 
-ENTRYPOINT ["run.sh"]
-
 EXPOSE 3000
 
+CMD ["./Crawler"]
