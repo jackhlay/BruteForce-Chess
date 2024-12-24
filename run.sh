@@ -1,3 +1,3 @@
 #!/bin/sh
-ORDINAL=$(echo $HOSTNAME | awk -F'-' '{print $NF}')
-exec ./Crawler "move=$ORDINAL"
+POD_ORDINAL=${HOSTNAME##*-}
+exec ./Crawler -move=$POD_ORDINAL

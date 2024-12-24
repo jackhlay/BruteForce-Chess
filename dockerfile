@@ -4,7 +4,7 @@ WORKDIR /app
 
 COPY go.mod go.sum ./
 COPY *.go ./
-COPY run.sh ./run.sh
+COPY ./run.sh ./run.sh
 
 RUN go mod tidy && go mod download
 RUN go build -o Crawler
