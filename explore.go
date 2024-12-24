@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math/rand"
 	"sync"
 
 	"github.com/notnil/chess"
@@ -89,12 +90,8 @@ func main() {
 	workQueue := make(chan Work, 1024)
 
 	var moveIndex int
-	flag.IntVar(&moveIndex, "move", 0, "Index of the opening move / pod number")
+	flag.IntVar(&moveIndex, "move", rand.Intn(20), "Index of the opening move / pod number")
 	flag.Parse()
-
-	if moveIndex < 0 || moveIndex > 19 {
-		moveIndex = 0
-	}
 
 	game := chess.NewGame()
 	position := game.Position()
