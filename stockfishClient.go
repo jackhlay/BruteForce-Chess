@@ -128,19 +128,15 @@ func processFen(conn *websocket.Conn, fen string, scoreChan chan float64, errCha
 	sendCommand(conn, "isready")
 	time.Sleep(100 * time.Millisecond) // Sleep briefly to let the engine initialize
 
-	sendCommand(conn, "ucinewgame")
-
 	log.Println("Looking for evaluation score (depth=2)...")
 	uciCommands := []string{
+		"ucinewgame",
 		fmt.Sprintf("position fen %s", fen),
 		"go depth 2",
 	}
-
-	// Send commands to Stockfish
-	for _, cmd := range uciCommands {
-		log.Println(">> uci:command", cmd)
-		sendCommand(conn, cmd)
-		time.Sleep(11 * time.Millisecond) // Sleep briefly to avoid busy waiting
+	for _, command := range uciCommands {
+		sendCommand(conn, command)
+		time.Sleep(110 * time.Millisecond) // Sleep briefly to avoid busy waiting
 	}
 	return nil
 }
