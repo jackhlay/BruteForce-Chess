@@ -125,6 +125,8 @@ func handleMessage(message []byte) (*float64, error) {
 
 // processFen processes the FEN string and returns the evaluation score.
 func processFen(conn *websocket.Conn, fen string, scoreChan chan float64, errChan chan error) error {
+	sendCommand(conn, "isready")
+	time.Sleep(100 * time.Millisecond) // Sleep briefly to let the engine initialize
 
 	sendCommand(conn, "ucinewgame")
 
