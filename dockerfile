@@ -9,7 +9,7 @@ COPY ./run.sh ./run.sh
 RUN go mod tidy && go mod download
 RUN go build -o Crawler
 
-RUN chmod +x /run.sh
+RUN chmod +x run.sh
 ENTRYPOINT ["run.sh"]
 
 EXPOSE 3000
