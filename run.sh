@@ -1,3 +1,3 @@
 #!/bin/sh
-POD_ORDINAL=${HOSTNAME##*-}
-exec ./Crawler -move=$POD_ORDINAL
+export POD_ORDINAL=${HOSTNAME##*-}
+./Crawler -move=$POD_ORDINAL
