@@ -1,6 +1,6 @@
 services:
   stockfish:
-    image: ivangabrielle/dockfish:latest
+    image: ivangabriele/dockfish:15
     container_name: stockfish
     ports:
       - "4000:4000"
@@ -9,20 +9,24 @@ services:
       - chessdqn
     networks:
       - chess-network
+    environment:
+      - PORT=4000
 
   chesscrawler:
-    image: jackhlay/chesscrawler:dev
+    image: jackhlay/chesscrawler:0.1.0
     container_name: chesscrawler
     ports:
       - "3000:3000"
     depends_on:
       - stockfish
+      - chessdqn
+      
     restart: on-failure
     networks:
       - chess-network
 
   chessdqn:
-    image: jackhlay/chessdqn:dev
+    image: jackhlay/chessdqn:0.1.0
     container_name: chessdqn
     ports:
       - "8000:8000"

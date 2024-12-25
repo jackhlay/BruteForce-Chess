@@ -90,6 +90,7 @@ func main() {
 	workQueue := make(chan Work, 1024)
 
 	var moveIndex int
+	// generate a random number between 0 and 20 for the flag value
 	flag.IntVar(&moveIndex, "move", rand.Intn(20), "Index of the opening move / pod number")
 	flag.Parse()
 

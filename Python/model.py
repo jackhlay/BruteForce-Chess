@@ -72,21 +72,21 @@ async def add_pos(pos: PosData):
         raise HTTPException(status_code=400, detail=f"Failed to process position: {e}")
 
 
-# Define the CNN model
+# Define the model
 class CNN(nn.Module):
     def __init__(self):
         super(CNN, self).__init__()
-        self.conv1 = nn.Conv2d(12, 64, kernel_size=3, padding=1)  # Input: 12 channels
-        self.conv2 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
-        self.conv3 = nn.Conv2d(128, 256, kernel_size=3, padding=1)
+        self.conv1 = nn.Conv2d(12, 128, kernel_size=3, padding=1)  # Input: 12 channels
+        self.conv2 = nn.Conv2d(128, 256, kernel_size=3, padding=1)
+        self.conv3 = nn.Conv2d(256, 1024, kernel_size=3, padding=1)
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)  # Pooling layer to reduce spatial size
         
         # The input size of the following linear layer depends on the input image size
         # Assuming the input image size is 64x64, we compute the output size after conv and pooling
         # After 3 convolution layers and pooling, the image size is reduced by a factor of 2 each time (assuming kernel=2 for pooling)
-        self.fc1 = nn.Linear(256, 1024)  # Flattened size after convolution and pooling
+        self.fc1 = nn.Linear(1024, 512)  # Flattened size after convolution and pooling
         
-        self.fc2 = nn.Linear(1024, 64)  # Output layer: one score per position
+        self.fc2 = nn.Linear(256, batch_size)  # Output layer: one score per position
 
     def forward(self, x):
         x = torch.relu(self.conv1(x))
