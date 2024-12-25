@@ -1,6 +1,7 @@
 # Standard library imports
 import random
 import logging
+import time
 import pprint
 from queue import Queue
 from typing import List
@@ -10,6 +11,7 @@ from asyncio import create_task, sleep
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import matplotlib.pyplot as plt
 import numpy as np
 import uvicorn
 from fastapi import FastAPI, HTTPException
@@ -52,9 +54,14 @@ class PosData(BaseModel):
 @app.get("/weights")
 async def get_weights():
     try:
-        return {"message": "Weights", "weights": CNN.state_dict()}
+        weights = CNN.state_dict()
+        weights_dict = {}
+        for name, param in weights.items():
+            # Convert tensor to a list of numbers
+            weights_dict[name] = param.detach().numpy().tolist()  # Convert tensor to list
+        return weights_dict
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Issue with")
+        raise HTTPException(status_code=500, detail=f"Issue with retrieving weights: {e}")
 
 @app.post("/")
 async def add_pos(pos: PosData):
@@ -180,6 +187,7 @@ def train(model: nn.Module, optimizer, criterion, training_data: List[dict]):
 
 # Background training loop
 async def training_loop():
+    start_time = time.time()
     idles = 0
     logging.basicConfig(level=logging.INFO)
     model = CNN(action_size=batch_size)
@@ -189,6 +197,12 @@ async def training_loop():
     global epsilon
 
     while True:
+        if idles >= 250:
+            logging.info("Queue Idle for too long. Saving weights and exiting...")
+            cleanup(start_time)
+            
+
+
         queue_size = data_queue.qsize()  # Capture the queue size at the start of the loop
         if queue_size >= batch_size:
             # Get a batch of data for training
@@ -202,6 +216,21 @@ async def training_loop():
         await sleep(1.73)  # Sleep for a short time before rechecking the queue size
         if queue_size == data_queue.qsize():
             idles += 1
+
+def cleanup(start_time):
+    global validationLosses
+
+    logging.info(f"Model Trained for a totla of {time.time() - start_time} seconds")
+    torch.save(model.state_dict(), "model_weights.pth")
+    plt.plot(np.arange(len(validationLosses)), validationLosses)  # Plot the actual values with indices as the x-axis
+
+    # Customize the plot
+    plt.title('Validation Loss per Epoch')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+
+    # Save the plot to a file
+    plt.savefig(f"lossgraph{time.now}")  #Uniquely generate a file name per batch. (will only work locally though need to figure out exporting from container)
 
 @app.on_event("startup")
 async def start_training():
