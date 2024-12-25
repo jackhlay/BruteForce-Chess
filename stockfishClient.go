@@ -56,7 +56,7 @@ func sfEval(fen string) float64 {
 
 	// Example to start the proces
 	println(fen)
-	if err := processFen(conn, fen, scoreChan, errChan); err != nil {
+	if err := processFen(conn, fen); err != nil {
 		log.Fatal("Error processing FEN:", err)
 	}
 
@@ -124,7 +124,7 @@ func handleMessage(message []byte) (*float64, error) {
 }
 
 // processFen processes the FEN string and returns the evaluation score.
-func processFen(conn *websocket.Conn, fen string, scoreChan chan float64, errChan chan error) error {
+func processFen(conn *websocket.Conn, fen string) error {
 	sendCommand(conn, "isready")
 	time.Sleep(100 * time.Millisecond) // Sleep briefly to let the engine initialize
 
@@ -136,7 +136,7 @@ func processFen(conn *websocket.Conn, fen string, scoreChan chan float64, errCha
 	}
 	for _, command := range uciCommands {
 		sendCommand(conn, command)
-		time.Sleep(110 * time.Millisecond) // Sleep briefly to avoid busy waiting
+		time.Sleep(37 * time.Millisecond) // Sleep briefly to avoid busy waiting
 	}
 	return nil
 }
@@ -150,37 +150,5 @@ func sendCommand(conn *websocket.Conn, command string) {
 	log.Printf("Sending command: %s", command) // Add this line for debugging
 	if err := conn.WriteJSON(cmdMsg); err != nil {
 		log.Println("WriteJSON error:", err)
-	}
-}
-
-// waitForEngineToBeReady waits until the engine is ready to receive commands.
-func waitForEngineToBeReady(conn *websocket.Conn) error {
-	// Send the isready command to Stockfish
-	sendCommand(conn, "isready")
-	// Loop until we receive the "readyok" response
-	timeout := time.After(30 * time.Second) // Timeout after 30 seconds
-	for {
-		select {
-		case <-timeout:
-			return fmt.Errorf("engine is not ready after waiting for 30 seconds")
-		default:
-			// Continuously check for messages
-			_, message, err := conn.ReadMessage()
-			if err != nil {
-				log.Println("Read error:", err)
-				return err
-			}
-
-			var eventData map[string]interface{}
-			if err := json.Unmarshal(message, &eventData); err != nil {
-				log.Println("Unmarshal error:", err)
-				continue
-			}
-
-			if strings.Contains(string(message), "readyok") {
-				engineConf.isEngineReady = true
-				return nil
-			}
-		}
 	}
 }

@@ -15,13 +15,13 @@ import uvicorn
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 # Hyperparameters
-epochs = 20
-batch_size = 128
-epsilon = 0.1  # Exploration rate
-lr = 1e-4
-gamma = 0.99
-epsilon_decay = 0.995
-min_epsilon = 0.01
+epochs = 29
+batch_size = 256
+epsilon = .9  # Exploration rate
+lr = 1e-5
+gamma = 0.9
+epsilon_decay = 0.98
+min_epsilon = 0.001
 
 # Constants
 board_depth = 12
@@ -31,6 +31,8 @@ board_size = 8
 action_map = {}
 
 action_size = len(action_map)   #action size
+
+validationLosses = []
 
 
 # Global Data queue for storing samples (shared across FastAPI app and training loop)
@@ -47,6 +49,13 @@ class PosData(BaseModel):
     end_rating: float
 
 # FastAPI route to add data to the queue
+@app.get("/weights")
+async def get_weights():
+    try:
+        return {"message": "Weights", "weights": CNN.state_dict()}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Issue with")
+
 @app.post("/")
 async def add_pos(pos: PosData):
     if data_queue.full():
@@ -74,31 +83,26 @@ async def add_pos(pos: PosData):
 
 # Define the model
 class CNN(nn.Module):
-    def __init__(self):
+    def __init__(self, action_size):
         super(CNN, self).__init__()
         self.conv1 = nn.Conv2d(12, 128, kernel_size=3, padding=1)  # Input: 12 channels
         self.conv2 = nn.Conv2d(128, 256, kernel_size=3, padding=1)
-        self.conv3 = nn.Conv2d(256, 1024, kernel_size=3, padding=1)
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)  # Pooling layer to reduce spatial size
-        
-        # The input size of the following linear layer depends on the input image size
-        # Assuming the input image size is 64x64, we compute the output size after conv and pooling
-        # After 3 convolution layers and pooling, the image size is reduced by a factor of 2 each time (assuming kernel=2 for pooling)
+
         self.fc1 = nn.Linear(1024, 512)  # Flattened size after convolution and pooling
-        
-        self.fc2 = nn.Linear(256, batch_size)  # Output layer: one score per position
+        self.fc2 = nn.Linear(512, 200)
+        self.fc3 = nn.Linear(200, action_size)  # Output layer: one score per action
 
     def forward(self, x):
         x = torch.relu(self.conv1(x))
         x = self.pool(x)  # Pool after first conv layer
         x = torch.relu(self.conv2(x))
         x = self.pool(x)  # Pool after second conv layer
-        x = torch.relu(self.conv3(x))
-        x = self.pool(x)  # Pool after third conv layer
         
         x = x.view(x.size(0), -1)  # Flatten the tensor before feeding into the fully connected layer
         x = torch.relu(self.fc1(x))
-        x = torch.relu(self.fc2(x))  # Output layer
+        x = torch.relu(self.fc2(x))
+        x = self.fc3(x)  # No activation function on the output layer
         return x
     
 def fen_to_tensor(fen: str) -> torch.Tensor:
@@ -172,12 +176,13 @@ def train(model: nn.Module, optimizer, criterion, training_data: List[dict]):
             batch_loss += loss.item()
 
         logging.info(f"Epoch {epoch + 1}/{epochs}, Loss: {batch_loss:.4f}, Epsilon: {epsilon:.4f}")
+        validationLosses.append(batch_loss)
 
 # Background training loop
 async def training_loop():
     idles = 0
     logging.basicConfig(level=logging.INFO)
-    model = CNN()
+    model = CNN(action_size=batch_size)
     optimizer = optim.Adam(model.parameters(), lr=lr)
     criterion = nn.L1Loss()
 
