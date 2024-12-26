@@ -18,7 +18,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 # Hyperparameters
 epochs = 29
-batch_size = 256
+batch_size = 1024
 epsilon = .9  # Exploration rate
 lr = 1e-5
 gamma = 0.9
@@ -53,6 +53,7 @@ class PosData(BaseModel):
 # FastAPI route to add data to the queue
 @app.get("/weights")
 async def get_weights():
+    global CNN
     try:
         weights = CNN.state_dict()
         weights_dict = {}
@@ -219,7 +220,7 @@ def cleanup(start_time):
     global validationLosses
 
     logging.info(f"Model Trained for a totla of {time.time() - start_time} seconds")
-    torch.save(model.state_dict(), "model_weights.pth")
+    torch.save(CNN.state_dict(), "model_weights.pth")
     plt.plot(np.arange(len(validationLosses)), validationLosses)  # Plot the actual values with indices as the x-axis
 
     # Customize the plot
