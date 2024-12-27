@@ -13,7 +13,9 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-var hostString = "stockfish.default.svc.cluster.local:4000"
+var hostString = "localhost:4000"
+
+// var hostString = "stockfish.default.svc.cluster.local:4000"
 
 type EngineConf struct {
 	isEngineReady   bool

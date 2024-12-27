@@ -36,6 +36,7 @@ action_size = len(action_map)   #action size
 
 validationLosses = []
 
+model = None
 
 # Global Data queue for storing samples (shared across FastAPI app and training loop)
 data_queue = Queue(maxsize=16384)
@@ -53,14 +54,12 @@ class PosData(BaseModel):
 # FastAPI route to add data to the queue
 @app.get("/weights")
 async def get_weights():
-    global CNN
+    global model
+    if model is None:
+        raise HTTPException(status_code=500, detail="Model is not initialized.")
     try:
-        weights = CNN.state_dict()
-        weights_dict = {}
-        for name, param in weights.items():
-            # Convert tensor to a list of numbers
-            weights_dict[name] = param.detach().numpy().tolist()  # Convert tensor to list
-        return weights_dict
+        weights = model.state_dict()
+        return {name: param.detach().numpy().tolist() for name, param in weights.items()}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Issue with retrieving weights: {e}")
 
@@ -188,6 +187,7 @@ def train(model: nn.Module, optimizer, criterion, training_data: List[dict]):
 
 # Background training loop
 async def training_loop():
+    global model
     start_time = time.time()
     idles = 0
     logging.basicConfig(level=logging.INFO)
