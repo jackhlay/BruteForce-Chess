@@ -36,7 +36,7 @@ action_size = len(action_map)   #action size
 
 validationLosses = []
 
-model = None
+global model, idles, totalIdles
 
 # Global Data queue for storing samples (shared across FastAPI app and training loop)
 data_queue = Queue(maxsize=16384)
@@ -187,9 +187,9 @@ def train(model: nn.Module, optimizer, criterion, training_data: List[dict]):
 
 # Background training loop
 async def training_loop():
-    global model
+    global model, idles, totalIdles
     start_time = time.time()
-    idles = 0
+    idles, totalIdles = 0, 0
     logging.basicConfig(level=logging.INFO)
     model = CNN(action_size=batch_size)
     optimizer = optim.Adam(model.parameters(), lr=lr)
@@ -198,9 +198,9 @@ async def training_loop():
     global epsilon
 
     while True:
-        if idles >= 250:
+        if idles > 1040:
             logging.info("Queue Idle for too long. Saving weights and exiting...")
-            cleanup(start_time)
+            break
 
         queue_size = data_queue.qsize()  # Capture the queue size at the start of the loop
         if queue_size >= batch_size:
@@ -208,19 +208,23 @@ async def training_loop():
             training_data = [data_queue.get() for _ in range(batch_size)]
             train(model, optimizer, criterion, training_data)
             logging.info("Batch processed. Waiting for more data...")
+            idles = 0
         else:
             # Print and log the current queue size continuously
-            logging.info(f"Queue size: {queue_size}. Idles: {idles}. Waiting for more data...")
+            logging.info(f"Queue size: {queue_size}. Idles: {idles}. Total Idles: {totalIdles}. Waiting for more data...")
 
         await sleep(1.73)  # Sleep for a short time before rechecking the queue size
         if queue_size == data_queue.qsize():
             idles += 1
+            totalIdles += 1
+    cleanup(start_time)
 
 def cleanup(start_time):
     global validationLosses
+    pprint.pprint(f"WEIGHTS / STATE DICT: {model.state_dict()}")
 
     logging.info(f"Model Trained for a totla of {time.time() - start_time} seconds")
-    torch.save(CNN.state_dict(), "model_weights.pth")
+    torch.save(CNN.state_dict(), "model_weights.txt")
     plt.plot(np.arange(len(validationLosses)), validationLosses)  # Plot the actual values with indices as the x-axis
 
     # Customize the plot
