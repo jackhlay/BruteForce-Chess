@@ -220,7 +220,7 @@ async def training_loop():
     cleanup(start_time)
 
 def cleanup(start_time):
-    global validationLosses
+    global validationLosses, model
     pprint.pprint(f"WEIGHTS / STATE DICT: {model.state_dict()}")
 
     logging.info(f"Model Trained for a totla of {time.time() - start_time} seconds")
