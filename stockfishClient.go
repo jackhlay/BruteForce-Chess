@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -42,7 +43,7 @@ func GetConn() *websocket.Conn {
 	if err != nil {
 		log.Fatal("Dial error:", err)
 	}
-	time.Sleep(time.Millisecond * 700)
+	time.Sleep(time.Millisecond * 70)
 	return conn
 }
 
@@ -63,6 +64,7 @@ func sfEval(fen string) float64 {
 	}
 
 	select {
+
 	case score := <-scoreChan:
 		fmt.Println("Evaluation score:", score)
 		return score
@@ -110,14 +112,19 @@ func handleMessage(message []byte) (*float64, error) {
 
 		// Extract score
 		if strings.Contains(payload, "depth 2") {
-			re := regexp.MustCompile(`score cp (-?\d+)`)
-			match := re.FindStringSubmatch(payload)
-			if match != nil {
-				score, err := strconv.Atoi(match[1])
-				if err != nil {
-					return nil, fmt.Errorf("invalid score format: %w", err)
+			if !strings.Contains(payload, "score mate") {
+				re := regexp.MustCompile(`score cp (-?\d+)`)
+				match := re.FindStringSubmatch(payload)
+				if match != nil {
+					score, err := strconv.Atoi(match[1])
+					if err != nil {
+						return nil, fmt.Errorf("invalid score format: %w", err)
+					}
+					scoreFloat := float64(score)
+					return &scoreFloat, nil
 				}
-				scoreFloat := float64(score)
+			} else {
+				scoreFloat := math.Inf(1)
 				return &scoreFloat, nil
 			}
 		}

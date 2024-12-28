@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math"
 	"sync"
 
 	"github.com/notnil/chess"
@@ -28,6 +29,7 @@ const maxWorkers = 2
 
 func worker(workQueue chan Work, pool chan struct{}, wg *sync.WaitGroup) {
 	for work := range workQueue {
+		endRating := 0.0
 		pool <- struct{}{} // Acquire worker slot
 		wg.Add(1)
 		go func(work Work) {
@@ -41,14 +43,26 @@ func worker(workQueue chan Work, pool chan struct{}, wg *sync.WaitGroup) {
 			startEval := sfEval(start)
 			game := chess.NewGame(fen)
 			game.MoveStr(work.move)
-
 			endfen := game.Position().String()
-			endRating := sfEval(endfen)
+			if game.Outcome() == chess.NoOutcome {
+				endRating = sfEval(endfen)
+			} else if game.Outcome() == chess.Draw {
+				endRating = 0
+				work.depth = 0
+			} else {
+				if game.Outcome() == chess.WhiteWon {
+					endRating = math.Inf(1)
+				}
+				if game.Outcome() == chess.BlackWon {
+					endRating = math.Inf(-1)
+				}
+				work.depth = 0
+			}
 
 			data := PosData{
 				StartFen:    start,
 				StartRating: startEval,
-				Action:      work.move, // Update with actual move
+				Action:      work.move,
 				EndFen:      endfen,
 				EndRating:   endRating,
 			}
@@ -123,10 +137,10 @@ func main() {
 	}
 
 	wg.Add(1)
-	workQueue <- Work{game.Position(), "", 15, nil}
+	workQueue <- Work{game.Position(), "", 7, nil}
 
 	wg.Wait()
-	go exploreMoves(game.Position(), 15, &wg, workQueue)
+	go exploreMoves(game.Position(), 7, &wg, workQueue)
 
 	wg.Wait()
 	close(workQueue)

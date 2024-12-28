@@ -22,6 +22,8 @@ func sendJSON(data PosData) {
 	// Check the response
 	if resp.StatusCode == http.StatusOK {
 		fmt.Printf("200OK %s\n", resp.Body)
+	} else if resp.StatusCode == http.StatusResetContent {
+		fmt.Printf("205 - End of the line! %s\n", resp.Body)
 	} else {
 		fmt.Printf("Failed with status code: %d\n", resp.StatusCode)
 	}
