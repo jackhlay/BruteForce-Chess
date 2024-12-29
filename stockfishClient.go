@@ -145,7 +145,7 @@ func processFen(conn *websocket.Conn, fen string) error {
 	}
 	for _, command := range uciCommands {
 		sendCommand(conn, command)
-		time.Sleep(37 * time.Millisecond) // Sleep briefly to avoid busy waiting
+		time.Sleep(17 * time.Millisecond) // Sleep briefly to avoid busy waiting
 	}
 	return nil
 }
