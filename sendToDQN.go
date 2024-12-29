@@ -7,6 +7,14 @@ import (
 	"net/http"
 )
 
+type PosData struct {
+	StartFen    string  `json:"start_fen"`
+	StartRating float64 `json:"start_rating"`
+	Action      string  `json:"action"`
+	EndFen      string  `json:"end_fen"`
+	EndRating   float64 `json:"end_rating"`
+}
+
 func sendJSON(data PosData) {
 	//send to dqn
 	jsonData, _ := json.Marshal(data)

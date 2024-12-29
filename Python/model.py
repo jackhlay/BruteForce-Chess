@@ -18,6 +18,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 # Hyperparameters
 epochs = 29
+cycles = 0
 batch_size = 1024
 epsilon = .9  # Exploration rate
 lr = 1e-5
@@ -52,6 +53,25 @@ class PosData(BaseModel):
     end_rating: float
 
 # FastAPI route to add data to the queue
+@app.post("/guess")
+async def guess(pos: PosData):
+    if model is None:
+        raise HTTPException(status_code=500, detail="Model is not initialized.")
+    try:
+        start_tensor = fen_to_tensor(pos.start_fen)
+        q_values = model(start_tensor.unsqueeze(0))
+        action_idx = q_values.argmax().item()
+        action = list(action_map.keys())[list(action_map.values()).index(action_idx)]
+        return {"action": action, "q_values": q_values.detach().numpy().tolist()}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to process position: {e}")
+
+@app.post("/stop")
+async def stop_training():
+    global idles
+    idles = 1041
+    return {"message": "Training stopped"}
+
 @app.get("/weights")
 async def get_weights():
     global model
@@ -143,7 +163,7 @@ def get_action_index(action):
 
 # Training loop:
 def train(model: nn.Module, optimizer, criterion, training_data: List[dict]):
-    global epsilon
+    global epsilon, cycles
     model.train()  # Set the model to training mode
 
     best_loss = float('inf')
@@ -184,10 +204,11 @@ def train(model: nn.Module, optimizer, criterion, training_data: List[dict]):
 
         logging.info(f"Epoch {epoch + 1}/{epochs}, Loss: {batch_loss:.4f}, Epsilon: {epsilon:.4f}")
         validationLosses.append(batch_loss)
+        cycles += 1
 
 # Background training loop
 async def training_loop():
-    global model, idles, totalIdles
+    global model, idles, totalIdles, cycles
     start_time = time.time()
     idles, totalIdles = 0, 0
     logging.basicConfig(level=logging.INFO)
@@ -200,6 +221,9 @@ async def training_loop():
     while True:
         if idles > 1040:
             logging.info("Queue Idle for too long. Saving weights and exiting...")
+            break
+        if cycles > 113:
+            logging.info("Cycles exceeded. Saving weights and exiting...")
             break
 
         queue_size = data_queue.qsize()  # Capture the queue size at the start of the loop
@@ -218,6 +242,9 @@ async def training_loop():
             idles += 1
             totalIdles += 1
     cleanup(start_time)
+    # stay up and wait for future requests
+    while True:
+        await sleep(.3)
 
 def cleanup(start_time):
     global validationLosses, model
@@ -234,6 +261,7 @@ def cleanup(start_time):
 
     # Save the plot to a file
     plt.savefig(f"lossgraph{time.now}")  #Uniquely generate a file name per batch. (will only work locally though need to figure out exporting from container)
+
 
 @app.on_event("startup")
 async def start_training():
