@@ -239,9 +239,6 @@ async def training_loop():
             idles += 1
             totalIdles += 1
     cleanup(start_time)
-    # stay up and wait for future requests
-    while True:
-        await sleep(.3)
 
 def cleanup(start_time):
     global validationLosses, model
