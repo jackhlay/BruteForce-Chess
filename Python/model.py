@@ -222,9 +222,6 @@ async def training_loop():
         if idles > 1040:
             logging.info("Queue Idle for too long. Saving weights and exiting...")
             break
-        if cycles > 113:
-            logging.info("Cycles exceeded. Saving weights and exiting...")
-            break
 
         queue_size = data_queue.qsize()  # Capture the queue size at the start of the loop
         if queue_size >= batch_size:
