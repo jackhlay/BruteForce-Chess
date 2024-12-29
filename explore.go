@@ -6,6 +6,7 @@ import (
 	"log"
 	"math"
 	"sync"
+	"time"
 
 	"github.com/notnil/chess"
 )
@@ -61,10 +62,10 @@ func worker(workQueue chan Work, pool chan struct{}, wg *sync.WaitGroup) {
 
 			data := PosData{
 				StartFen:    start,
-				StartRating: startEval,
+				StartRating: startEval / 100,
 				Action:      work.move,
 				EndFen:      endfen,
-				EndRating:   endRating,
+				EndRating:   endRating / 100,
 			}
 			fmt.Println(data)
 			sendJSON(data)
@@ -73,6 +74,7 @@ func worker(workQueue chan Work, pool chan struct{}, wg *sync.WaitGroup) {
 			wg.Done()
 
 			// Recurse into the next depth
+			time.Sleep(150 * time.Millisecond)
 			exploreMoves(game.Position(), work.depth, wg, workQueue)
 		}(work)
 	}
@@ -125,7 +127,7 @@ func main() {
 		StartRating: 0,
 		Action:      moves[moveIndex].String(),
 		EndFen:      endfen,
-		EndRating:   endRating,
+		EndRating:   endRating / 100,
 	}
 	sendJSON(data)
 
