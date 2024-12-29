@@ -53,7 +53,7 @@ class PosData(BaseModel):
     end_rating: float
 
 # FastAPI route to add data to the queue
-@app.post("/guess")
+@app.get("/guess")
 async def guess(pos: PosData):
     if model is None:
         raise HTTPException(status_code=500, detail="Model is not initialized.")
@@ -66,11 +66,11 @@ async def guess(pos: PosData):
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to process position: {e}")
 
-@app.post("/stop")
+@app.get("/stop")
 async def stop_training():
     global idles
     idles = 1041
-    return {"message": "Training stopped"}
+    return {"message": "Training will stop soon"}
 
 @app.get("/weights")
 async def get_weights():
