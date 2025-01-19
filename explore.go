@@ -41,12 +41,12 @@ func worker(workQueue chan Work, pool chan struct{}, wg *sync.WaitGroup) {
 			}()
 			start := work.pos.String()
 			fen, _ := chess.FEN(start)
-			startEval := sfEval(start)
+			startEval := 0.0 // No longer using stockfish container, instead Lichess Api.
 			game := chess.NewGame(fen)
 			game.MoveStr(work.move)
 			endfen := game.Position().String()
 			if game.Outcome() == chess.NoOutcome {
-				endRating = sfEval(endfen)
+				endRating = 0.17 // No longer using stockfish container, instead Lichess Api. TODO: make call to berserker api
 			} else if game.Outcome() == chess.Draw {
 				endRating = 0
 				work.depth = 0
@@ -120,8 +120,7 @@ func main() {
 	}
 
 	endfen := position.String()
-	endRating := sfEval(endfen)
-
+	endRating := .17 // No longer using stockfish container, instead Lichess Api.
 	data := PosData{
 		StartFen:    startfen,
 		StartRating: 0,

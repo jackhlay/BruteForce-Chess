@@ -61,7 +61,7 @@ class theNN(nn.Module):
         self.fc1 = nn.Linear(input_size, hidden_size)
         self.fc2 = nn.Linear(hidden_size, hidden_size)
         self.fc3 = nn.Linear(hidden_size, output_size)
-        self.dropout = nn.Dropout(0.5)  # Optional, can help reduce overfitting.
+        self.dropout = nn.Dropout(0.3) # Dropout layer to prevent overfitting
 
     def forward(self, x):
         x = torch.relu(self.fc1(x))
