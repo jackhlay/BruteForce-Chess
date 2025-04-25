@@ -12,19 +12,6 @@ services:
     environment:
       - PORT=4000
 
-  chesscrawler:
-    image: jackhlay/chesscrawler:0.1.0
-    container_name: chesscrawler
-    ports:
-      - "3000:3000"
-    depends_on:
-      - stockfish
-      - chessdqn
-      
-    restart: on-failure
-    networks:
-      - chess-network
-
   chessdqn:
     image: jackhlay/chessdqn:0.1.0
     container_name: chessdqn

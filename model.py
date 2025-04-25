@@ -1,4 +1,6 @@
 # Standard library imports
+import asyncio
+import os
 import random
 import logging
 import time
@@ -6,16 +8,19 @@ import pprint
 from queue import Queue
 from typing import List
 from asyncio import create_task, sleep
- 
+
+#Move Generator
+from gens import rando, generate
+
 # Third-party imports
+from fastapi import FastAPI, HTTPException
+import matplotlib.pyplot as plt
+import numpy as np
+from pydantic import BaseModel
+import redis
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import matplotlib.pyplot as plt
-import numpy as np
-import uvicorn
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
 # Hyperparameters
 epochs = 29
 cycles = 0
@@ -32,15 +37,13 @@ board_size = 8
 
 # Action map to convert string actions to integer indices
 action_map = {}
-
 action_size = len(action_map)   #action size
-
 validationLosses = []
-
 global model, idles, totalIdles
 
 # Global Data queue for storing samples (shared across FastAPI app and training loop)
-data_queue = Queue(maxsize=16384)
+data_queue = Queue(maxsize=750)
+
 
 # FastAPI for receiving data
 app = FastAPI()
@@ -135,7 +138,8 @@ def train(training_data: List[dict]):
         cycles += 1
 
 # Background training loop
-async def training_loop():
+async def training_loop(red: redis.Redis):
+
     global model, idles, totalIdles, cycles
     logging.basicConfig(level=logging.INFO)
 
@@ -144,9 +148,9 @@ async def training_loop():
     global epsilon
 
     while True:
-        if idles > 1040:
-            logging.info("Queue Idle for too long. Saving weights and exiting...")
-            break
+        # if idles > 1040:
+        #     logging.info("Queue Idle for too long. Saving weights and exiting...")
+        #     break
 
         queue_size = data_queue.qsize()  # Capture the queue size at the start of the loop
         if queue_size >= batch_size:
@@ -163,7 +167,7 @@ async def training_loop():
         if queue_size == data_queue.qsize():
             idles += 1
             totalIdles += 1
-    cleanup(start_time)
+    # cleanup(start_time)
 
 def cleanup(start_time):
     global validationLosses, model
@@ -181,67 +185,16 @@ def cleanup(start_time):
     # Save the plot to a file
     plt.savefig(f"lossgraph_{time.time()}.png")  # Use a timestamp to generate unique filenames
 
-# FastAPI route to add data to the queue
-@app.get("/guess")
-async def guess(pos: PosData):
-    if model is None:
-        raise HTTPException(status_code=500, detail="Model is not initialized.")
-    try:
-        start_tensor = fen_to_tensor(pos.start_fen)
-        q_values = model(start_tensor.unsqueeze(0))
-        action_idx = q_values.argmax().item()
-        action = list(action_map.keys())[list(action_map.values()).index(action_idx)]
-        return {"action": action, "q_values": q_values.detach().numpy().tolist()}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to process position: {e}")
-
-@app.get("/stop")
-async def stop_training():
-    global idles
-    idles = 1041
-    return {"message": "Training will stop soon"}
-
-@app.get("/weights")
-async def get_weights():
-    global model
-    if model is None:
-        raise HTTPException(status_code=500, detail="Model is not initialized.")
-    try:
-        weights = model.state_dict()
-        return {name: param.detach().numpy().tolist() for name, param in weights.items()}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Issue with retrieving weights: {e}")
-
-@app.post("/")
-async def add_pos(pos: PosData):
-    if data_queue.full():
-        raise HTTPException(status_code=503, detail="Queue is full. Try again later.")
-
-    try:
-        pprint.pprint(pos)
-        start_tensor = fen_to_tensor(pos.start_fen)
-        end_tensor = fen_to_tensor(pos.end_fen)
-
-        sample = {
-            "start_tensor": start_tensor,
-            "start_rating": pos.start_rating,
-            "action": pos.action,
-            "end_tensor": end_tensor,
-            "end_rating": pos.end_rating,
-        }
-
-        # Put sample in the shared queue
-        data_queue.put(sample)
-        return {"message": "Position added to queue", "queue_size": data_queue.qsize()}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to process position: {e}")
-
-
-@app.on_event("startup")
 async def start_training():
     global model
+    red = redis.Redis(host=os.getenv("REDHOST"), port=os.getenv("REDPORT"), db=1)
     model = theNN(768, 512, batch_size)
-    create_task(training_loop()) # Start the training loop in the background
+    create_task(training_loop(red)) # Start the training loop in the background
+    if os.getenv("RANDO"):
+        create_task(rando(red))
+    else:
+        create_task(generate(red))
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    print("starting")
+    asyncio.run(start_training())

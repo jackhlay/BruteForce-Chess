@@ -1,16 +1,11 @@
-FROM golang:1.22.10-bullseye
+FROM python:3.12.8-slim-bullseye
 
 WORKDIR /app
 
-COPY go.mod go.sum ./
-COPY *.go ./
-COPY ./run.sh ./run.sh
+COPY model.py reqs.txt ./
 
-RUN go mod tidy && go mod download
-RUN go build -o Crawler
+RUN pip install --no-cache-dir -r reqs.txt
 
-RUN chmod +x run.sh
+EXPOSE 8000
 
-EXPOSE 3000
-
-CMD ["./Crawler"]
+CMD ["python", "model.py"]

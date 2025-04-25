@@ -45,6 +45,8 @@ var/
 wheels/
 share/python-wheels/
 *.egg-info/
+/old
+old/
 .installed.cfg
 *.egg
 MANIFEST
@@ -172,3 +174,4 @@ cython_debug/
 #.idea/
 uvicorn command.txt
 stockfishClient.go
+
