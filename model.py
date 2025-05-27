@@ -3,14 +3,11 @@ import asyncio
 import os
 import random
 import logging
-import time
 import pprint
 from queue import Queue
+import time
 from typing import List
-from asyncio import create_task, sleep
 
-#Move Generator
-from gens import rando, generate
 
 # Third-party imports
 from fastapi import FastAPI, HTTPException
@@ -21,6 +18,7 @@ import redis
 import torch
 import torch.nn as nn
 import torch.optim as optim
+
 # Hyperparameters
 epochs = 29
 cycles = 0
@@ -55,7 +53,11 @@ class PosData(BaseModel):
     end_fen: str
     end_rating: float
 
-
+#Redis Connection
+red = redis.Redis(
+    host = "localhost",
+    port = 6379
+    )
 
 # Define the model
 class theNN(nn.Module):
@@ -152,8 +154,10 @@ async def training_loop(red: redis.Redis):
         #     logging.info("Queue Idle for too long. Saving weights and exiting...")
         #     break
 
-        queue_size = data_queue.qsize()  # Capture the queue size at the start of the loop
-        if queue_size >= batch_size:
+        # queue_size = data_queue.qsize()  # Capture the queue size at the start of the loop
+        queue_size = 0
+        print(f"REDIS SET SIZE:{queue_size}")
+        if queue_size >= 1000000:
             # Get a batch of data for training
             training_data = list([data_queue.get() for _ in range(batch_size)])
             train(training_data)
@@ -163,7 +167,7 @@ async def training_loop(red: redis.Redis):
             # Print and log the current queue size continuously
             logging.info(f"Queue size: {queue_size}. Idles: {idles}. Total Idles: {totalIdles}. Waiting for more data...")
 
-        await sleep(1.73)  # Sleep for a short time before rechecking the queue size
+        time.sleep(1.3)  # Sleep for a short time before rechecking the queue size
         if queue_size == data_queue.qsize():
             idles += 1
             totalIdles += 1
@@ -187,13 +191,9 @@ def cleanup(start_time):
 
 async def start_training():
     global model
-    red = redis.Redis(host=os.getenv("REDHOST"), port=os.getenv("REDPORT"), db=1)
+    red = redis.Redis(host=os.getenv("REDHOST", "localhost"), port=os.getenv("REDPORT", 6379), db=1)
     model = theNN(768, 512, batch_size)
-    create_task(training_loop(red)) # Start the training loop in the background
-    if os.getenv("RANDO"):
-        create_task(rando(red))
-    else:
-        create_task(generate(red))
+    asyncio.create_task(training_loop(red)) # Start the training loop in the background
 
 if __name__ == "__main__":
     print("starting")
