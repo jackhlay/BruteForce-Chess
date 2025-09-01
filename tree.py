@@ -77,7 +77,7 @@ def expand_one(node: Node) -> Node:
 def rollout(board: chess.Board, max_deptht: int=13) -> float:
     depth = 0
     while not board.is_game_over() and depth < max_deptht:
-        moves = board.legal_moves()
+        moves = board.legal_moves
         #
         caps_checks = [m for m in moves if board.is_capture(m) or board.gives_check(m)]
         move = random.choice(list(caps_checks) if caps_checks else list(moves))
@@ -98,7 +98,7 @@ def backProp_Path(path , valueFromWhite: float):
        signed = valueFromWhite if node.gameState.turn == chess.WHITE else -valueFromWhite
        node.update(value=signed)
 
-def mcts(root: Node, iterations: int = 1000) -> str:
+def mcts(root: Node, iterations: int = 1000) -> chess.Move:
     for _ in range(iterations):
         leaf,path = select_with_path(root)
         child = expand_one(leaf)
@@ -125,7 +125,6 @@ def heurEval(board: chess.Board) -> float:
     for piece_type, pv in piece_values.items():
         value += len(board.pieces(piece_type, chess.WHITE)) * pv
         value -= len(board.pieces(piece_type, chess.BLACK)) * pv
-    # normalize to roughly [-? , ?]; dividing by 100 keeps values small and comparable to [-1,1]
     return value / 100.0
 
 if __name__ == "__main__":
