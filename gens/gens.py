@@ -31,34 +31,6 @@ async def askStockFish(fen:str) -> float:
             else:
                 continue
 
-
-
-async def generate(red: Redis):
-    board = chess.Board()
-    moves = list(board.legal_moves)
-    depth = 7.0
-
-    for move in moves:
-        board.push_san(str(move))
-        postFen = board.fen()
-        rating = await askStockFish(postFen)
-        payload = {"fen":postFen, "rating":rating}
-        red.sadd("BRUTE", json.dumps(payload))
-        await recurse(postFen, depth-.5)
-    #TODO: Implement proper recursion
-
-async def recurse(fen, depth):
-    board = chess.Board(fen)
-    moves = list(board.legal_moves)
-    if depth <= 0.000001:
-        print("MAX DEPTH REACHED. SHUTTING DOWN...")
-        return
-
-    for move in moves:
-        board.push_san(str(move))
-        nFen = board.fen()
-        await recurse(nFen, depth-.5)
-
 async def rando(red: Redis):
     board = chess.Board()
     depth = 7500.0
@@ -83,5 +55,4 @@ red = Redis(
 
 async def main():
     await rando(red)
-
 asyncio.run(main())
