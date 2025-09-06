@@ -55,9 +55,8 @@ def get_node(gamestate: chess.Board, move:chess.Move = None, parent: Node = None
     fen = gamestate.fen()
     if fen in TranspositionTable:
         return TranspositionTable[fen]
-    node = Node(gamestate, move, parent)
-    TranspositionTable[fen] = node
-    return node
+    TranspositionTable[fen] = Node(gamestate, move, parent)
+    return TranspositionTable[fen] 
 
 def select_with_path(root: Node):
     current = root
@@ -74,13 +73,14 @@ def expand_one(node: Node) -> Node:
         return random.choice(list(node.children.values()))
     return node
 
-def rollout(board: chess.Board, max_deptht: int=13) -> float:
+def rollout(board: chess.Board, max_deptht: int=19) -> float:
     depth = 0
     while not board.is_game_over() and depth < max_deptht:
         moves = board.legal_moves
         #
-        caps_checks = [m for m in moves if board.is_capture(m) or board.gives_check(m)]
-        move = random.choice(list(caps_checks) if caps_checks else list(moves))
+        caps_checks = [m for m in moves if (board.is_capture(m) or board.gives_check(m))]
+        # move = random.choice(list(caps_checks) if caps_checks else list(moves))
+        move = random.choice(list(moves))
         board.push(move)
         depth += 1
     
@@ -90,7 +90,7 @@ def rollout(board: chess.Board, max_deptht: int=13) -> float:
         elif result == '0-1': return -1.0
         else: return 0.0
     
-    TranspositionTable.clear()
+    # TranspositionTable.clear()
     return heurEval(board)
 
 def backProp_Path(path , valueFromWhite: float):
@@ -99,7 +99,8 @@ def backProp_Path(path , valueFromWhite: float):
        node.update(value=signed)
 
 def mcts(root: Node, iterations: int = 1000) -> chess.Move:
-    for _ in range(iterations):
+    for i in range(iterations):
+        # print(f"ITER NUMBER {i}")
         leaf,path = select_with_path(root)
         child = expand_one(leaf)
         if child is not path[-1]:
@@ -125,10 +126,22 @@ def heurEval(board: chess.Board) -> float:
     for piece_type, pv in piece_values.items():
         value += len(board.pieces(piece_type, chess.WHITE)) * pv
         value -= len(board.pieces(piece_type, chess.BLACK)) * pv
-    return value / 100.0
+    if board.turn == chess.BLACK: 
+        blackMoves = len(list(board.legal_moves))
+        WBOARD = board.push(chess.Move.null())
+        whiteMoves = len(list(board.legal_moves))
+        board.push(chess.Move.null())
+
+    else:
+        whiteMoves = len(list(board.legal_moves))
+        board.push(chess.Move.null())
+        blackMoves = len(list(board.legal_moves))
+        board.push(chess.Move.null())
+
+    return value / 100.0 + ((whiteMoves-blackMoves)/10)
 
 if __name__ == "__main__":
     board = chess.Board()
     root = get_node(board)
-    best_move = mcts(root, iterations=1000)
+    best_move = mcts(root, iterations=1300)
     print(f"Best move: {best_move}")
