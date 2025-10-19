@@ -114,7 +114,6 @@ def build(iters=iters):
         path= [board.fen()]
         iters -= 1
 
-    print(f"T TABLE LEN: {len(TranspositionTable.keys())})")
     tbl = pickle.dumps(TranspositionTable)
     red.set("T_TABLE", tbl)
 
@@ -130,9 +129,11 @@ def runStats():
       print(f"MAX: {max_node.fen} ({max_node.totalValue}), VISITS: {max_node.visited}, AVG: {max_node.averageValue}")
       print(f"LOWEST: {min_node.fen} ({min_node.totalValue}), VISITS: {min_node.visited}, AVG: {min_node.averageValue}")
       print(f"Most Visisted: {most_visited.fen} ({most_visited.totalValue}), VISITS: {most_visited.visited}, AVG: {most_visited.averageValue}")
+      print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+      print(f"T TABLE LEN: {len(table.keys())}")
       print(f"TABLE SIZE: {sys.getsizeof(table)/1000000} mb")
       
 
 
-build(iters=1307)
+# build(iters=1738)
 runStats()
