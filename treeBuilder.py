@@ -79,7 +79,7 @@ def update_table(redis_client=red):
 
 def build(iters=iters):
     board = chess.Board()
-    path = [board]
+    path = [board.fen()]
     
     if TranspositionTable == {}:
         update_table()
@@ -104,21 +104,19 @@ def build(iters=iters):
     
         for i in reversed(path):
             print(f"UPDATING {i}, TYPE:({type(i)})")
-            if type(i) == type(chess.Board()):
-                board = i
-            else:
-                board = chess.Board(i)
+            board = chess.Board(i)
             node = get_node(board)
             print(f"{node.ffen}")
             node.update(res)
             res = -res
 
         board = chess.Board()
-        path= [board]
+        path= [board.fen()]
         iters -= 1
 
     print(f"T TABLE LEN: {len(TranspositionTable.keys())})")
-    red.set("T_TABLE", pickle.dumps(TranspositionTable))
+    tbl = pickle.dumps(TranspositionTable)
+    red.set("T_TABLE", tbl)
 
 def runStats():
       raw = red.get("T_TABLE")
@@ -131,12 +129,10 @@ def runStats():
 
       print(f"MAX: {max_node.fen} ({max_node.totalValue}), VISITS: {max_node.visited}, AVG: {max_node.averageValue}")
       print(f"LOWEST: {min_node.fen} ({min_node.totalValue}), VISITS: {min_node.visited}, AVG: {min_node.averageValue}")
-    #   print(f"Highest Average: {high_avg.fen} ({high_avg.totalValue}), VISITS: {high_avg.visited}")
-    #   print(f"Lowest Average: {low_avg.fen} ({low_avg.totalValue}), VISITS: {low_avg.visited}")
       print(f"Most Visisted: {most_visited.fen} ({most_visited.totalValue}), VISITS: {most_visited.visited}, AVG: {most_visited.averageValue}")
       print(f"TABLE SIZE: {sys.getsizeof(table)/1000000} mb")
       
 
 
-build(iters=2500)
+build(iters=1307)
 runStats()
