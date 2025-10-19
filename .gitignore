@@ -58,6 +58,8 @@ MANIFEST
 *.spec
 
 venv/
+gens/
+model/
 
 # Installer logs
 pip-log.txt
