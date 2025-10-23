@@ -1,3 +1,7 @@
+import seaborn as sns
+import matplotlib.pyplot as plt
+import pandas as pd
+
 import chess
 import math
 import random
@@ -103,7 +107,6 @@ def build(iters=iters):
                 res =  0.0
     
         for i in reversed(path):
-            print(f"UPDATING {i}, TYPE:({type(i)})")
             board = chess.Board(i)
             node = get_node(board)
             print(f"{node.ffen}")
@@ -133,7 +136,37 @@ def runStats():
       print(f"T TABLE LEN: {len(table.keys())}")
       print(f"TABLE SIZE: {sys.getsizeof(table)/1000000} mb")
       
+def graphit(path=[Node] | None):
+    raw = red.get("T_TABLE")
+    treedict = pickle.loads(raw)
+    nodes = list(treedict.values())
 
+    # safe attribute extraction with fallbacks
+    visits = [getattr(n, "visited", 0) for n in nodes]
+    positions = [getattr(n, "fen", getattr(n, "fen", "")) for n in nodes]
+    scores = [getattr(n, "averageValue", 0.0) for n in nodes]
 
-# build(iters=1738)
-runStats()
+    x = list(range(len(positions)))
+    y = list(scores) 
+
+    #TODO: ADD ABILITY TO PASS IN LIST AND VISUALIZE A PATH, needs to get index for all moves but this is ok. Will have to account for novelties
+    if path:
+        for n in path:
+            #Not sure this will work
+            x = positions.index(n)
+        pass
+
+    sizes = [max(10, v) for v in visits]
+    fig, ax = plt.subplots(figsize=(16, 9))
+    ax.set_facecolor("black")
+    sc = ax.scatter(x, y, s=sizes, c=scores, cmap="RdPu", alpha=0.8, edgecolors="w", linewidths=0.2)
+
+    cbar = plt.colorbar(sc, ax=ax, label="averageValue")
+    # ensure colorbar and ticks are readable on black background
+    cbar.ax.yaxis.label.set_color("black")
+    cbar.ax.tick_params(colors="black")
+
+    ax.set_title(f"Positions: {len(positions)}", color="black")
+    plt.show()
+
+build(iters=513)

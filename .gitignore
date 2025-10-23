@@ -179,3 +179,4 @@ cython_debug/
 uvicorn command.txt
 stockfishClient.go
 
+/.vscode
