@@ -136,7 +136,7 @@ def runStats():
       print(f"T TABLE LEN: {len(table.keys())}")
       print(f"TABLE SIZE: {sys.getsizeof(table)/1000000} mb")
       
-def graphit(path=[Node] | None):
+def graphit(path=None):
     raw = red.get("T_TABLE")
     treedict = pickle.loads(raw)
     nodes = list(treedict.values())
@@ -149,17 +149,15 @@ def graphit(path=[Node] | None):
     x = list(range(len(positions)))
     y = list(scores) 
 
-    #TODO: ADD ABILITY TO PASS IN LIST AND VISUALIZE A PATH, needs to get index for all moves but this is ok. Will have to account for novelties
-    if path:
-        for n in path:
-            #Not sure this will work
-            x = positions.index(n)
-        pass
-
     sizes = [max(10, v) for v in visits]
     fig, ax = plt.subplots(figsize=(16, 9))
     ax.set_facecolor("black")
-    sc = ax.scatter(x, y, s=sizes, c=scores, cmap="RdPu", alpha=0.8, edgecolors="w", linewidths=0.2)
+    sc = ax.scatter(x, y, s=sizes, c=scores, cmap="RdPu", alpha=0.8, linewidths=0.2)
+        #TODO: ADD ABILITY TO PASS IN LIST AND VISUALIZE A PATH, needs to get index for all moves but this is ok. Will have to account for novelties
+    if path:
+        xVals=[positions.index(a) for a in path]
+        yVals=[getattr(n, "averageValue", 0.0) for n in path]
+        plt.plot(xVals, yVals, color='red')
 
     cbar = plt.colorbar(sc, ax=ax, label="averageValue")
     # ensure colorbar and ticks are readable on black background
@@ -169,4 +167,5 @@ def graphit(path=[Node] | None):
     ax.set_title(f"Positions: {len(positions)}", color="black")
     plt.show()
 
-build(iters=513)
+# build(iters=513)
+graphit()
