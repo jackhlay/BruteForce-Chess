@@ -75,20 +75,12 @@ def get_node(gamestate: chess.Board) -> Node:
     TranspositionTable[fen] = Node(gamestate)
     return TranspositionTable[fen]
     
-def update_table():
-    try:
-        with open('dicto.pkl', 'rb') as file:
-            storedTable = pickle.load(file)
-        TranspositionTable.update(storedTable)
-    except Exception as e:
-        print(f"Failed to load transposition table: {e}")
-
 def build(iters=iters):
     board = chess.Board()
     path = [board.fen()]
     
-    if TranspositionTable == {}:
-        update_table()
+    with open('dicto.pkl', 'rb') as file:
+            TranspositionTable = pickle.load(file)
 
     for _ in range(iters):
         while not board.is_game_over():
@@ -173,7 +165,7 @@ def graphit(path=None):
     plt.show()
 
 ##################
-#TESTING FUNCTIONS
+#UTIL FUNCTIONS
 ##################
 def sendpos(fen: str):
     payload = {
@@ -189,7 +181,7 @@ async def query_stockfish(fen: str):
     async with websockets.connect(uri) as ws:
         # Send position and go
         await ws.send(json.dumps({"type": "uci:command", "payload": f"position fen {fen}"}))
-        await ws.send(json.dumps({"type": "uci:command", "payload": "go depth 5"}))
+        await ws.send(json.dumps({"type": "uci:command", "payload": "go depth 2"}))
         # Wait for bestmove response
         async for msg in ws:
             print(msg)
@@ -202,19 +194,18 @@ def get_bestmove(fen: str):
     print(f"RES: {res}")
     return res
 
-def play_game(iters=75):
+def play_game(iters=17):
     board = chess.Board()
     path = [board.fen()]
     
-    if TranspositionTable == {}:
-        update_table()
+    with open('dicto.pkl', 'rb') as file:
+            TranspositionTable = pickle.load(file)
 
     for _ in range(iters):
         if random.random() <= 0.5:
             fish = chess.BLACK
         else:
             fish = chess.WHITE
-        update_table()
         while not board.is_game_over():
             if board.turn == fish:
                 move = chess.Move.from_uci(get_bestmove(board.fen()))
@@ -265,7 +256,6 @@ def play_game(iters=75):
         print("Game over!~")
 
 # build(iters=5413)
-# runStats()
-# graphit()
-
 play_game()
+runStats()
+graphit()
