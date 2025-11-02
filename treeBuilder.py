@@ -2,16 +2,21 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import pandas as pd
 
+import asyncio
+import requests
+import json
+import websockets
+
 import chess
 import math
 import random
-import redis
 import pickle
 import sys
+import time
+
 
 
 iters = 537
-red = redis.Redis(host='localhost', port=6379, db=0)
 TranspositionTable = {}
 class Node:
     """
@@ -59,7 +64,9 @@ class Node:
         return self.averageValue + (
             c * math.sqrt(math.log(parent_visits) / self.visited)
         )
-    
+
+
+  
 def get_node(gamestate: chess.Board) -> Node:
     fens = gamestate.fen().split(" ")[:2]
     fen = " ".join(fens)
@@ -68,15 +75,10 @@ def get_node(gamestate: chess.Board) -> Node:
     TranspositionTable[fen] = Node(gamestate)
     return TranspositionTable[fen]
     
-def update_table(redis_client=red):
-    raw = redis_client.get("T_TABLE")
-    if not raw:
-        return
-
+def update_table():
     try:
-        storedTable = pickle.loads(raw)
-        if not isinstance(storedTable, dict):
-            return
+        with open('dicto.pkl', 'rb') as file:
+            storedTable = pickle.load(file)
         TranspositionTable.update(storedTable)
     except Exception as e:
         print(f"Failed to load transposition table: {e}")
@@ -87,7 +89,6 @@ def build(iters=iters):
     
     if TranspositionTable == {}:
         update_table()
-        # print(TranspositionTable.keys())
 
     for _ in range(iters):
         while not board.is_game_over():
@@ -117,12 +118,16 @@ def build(iters=iters):
         path= [board.fen()]
         iters -= 1
 
-    tbl = pickle.dumps(TranspositionTable)
-    red.set("T_TABLE", tbl)
+    with open('dicto.pkl', 'wb') as file:
+        pickle.dump(TranspositionTable, file)
+        # Use pickle.dump to serialize and save the object to the file
 
+####################
+# DEMO FUNCTIONS
+####################
 def runStats():
-      raw = red.get("T_TABLE")
-      table = pickle.loads(raw)
+      with open('dicto.pkl', 'rb') as file:
+        table = pickle.load(file)
       max_node = max(table.values(), key=lambda n: getattr(n, "totalValue", float("-inf")))
       min_node = min(table.values(), key=lambda n: getattr(n, "totalValue", float("inf")))
       high_avg = max(table.values(), key=lambda n: getattr(n, "averageValue", float("-inf")))
@@ -137,8 +142,8 @@ def runStats():
       print(f"TABLE SIZE: {sys.getsizeof(table)/1000000} mb")
       
 def graphit(path=None):
-    raw = red.get("T_TABLE")
-    treedict = pickle.loads(raw)
+    with open('dicto.pkl', 'rb') as file:
+        treedict = pickle.load(file)
     nodes = list(treedict.values())
 
     # safe attribute extraction with fallbacks
@@ -167,5 +172,100 @@ def graphit(path=None):
     ax.set_title(f"Positions: {len(positions)}", color="black")
     plt.show()
 
-# build(iters=513)
-graphit()
+##################
+#TESTING FUNCTIONS
+##################
+def sendpos(fen: str):
+    payload = {
+        "fen": fen,
+        "evalSource1": "N/A",
+        "evalSource2": "N/A"
+    }
+    response = requests.post(uri, json=payload)  # Use json=payload
+    print(response.status_code, response.text)
+    print(f"pos sent! {response}")
+
+async def query_stockfish(fen: str):
+    async with websockets.connect(uri) as ws:
+        # Send position and go
+        await ws.send(json.dumps({"type": "uci:command", "payload": f"position fen {fen}"}))
+        await ws.send(json.dumps({"type": "uci:command", "payload": "go depth 5"}))
+        # Wait for bestmove response
+        async for msg in ws:
+            print(msg)
+            data = json.loads(msg)
+            if data.get("type") == "uci:response" and ("bestmove" in data.get("payload")):
+                return data["payload"].split(" ")[1]
+
+def get_bestmove(fen: str):
+    res = asyncio.run(query_stockfish(fen))
+    print(f"RES: {res}")
+    return res
+
+def play_game(iters=75):
+    board = chess.Board()
+    path = [board.fen()]
+    
+    if TranspositionTable == {}:
+        update_table()
+
+    for _ in range(iters):
+        if random.random() <= 0.5:
+            fish = chess.BLACK
+        else:
+            fish = chess.WHITE
+        update_table()
+        while not board.is_game_over():
+            if board.turn == fish:
+                move = chess.Move.from_uci(get_bestmove(board.fen()))
+                board.push(move)
+                path.append(board.fen())
+                sendpos(board.fen())
+                time.sleep(.7)
+            else:
+                node = get_node(board)
+                if not node.children:
+                   node.expand()
+                
+                moves=list(board.legal_moves)
+                caps_checks = [m for m in moves if (board.is_capture(m) or board.gives_check(m))]
+                move = random.choice(caps_checks) if caps_checks else random.choice(moves)
+
+                board.push(move)
+                path.append(board.fen())
+                sendpos(board.fen())
+                time.sleep(.1)
+        
+        if board.is_game_over():
+            result = board.result()
+            if result == "1-0":
+                res = 1.0
+            elif result == "0-1":
+                res = -1.0
+            else:
+                res =  0.0
+    
+        for i in reversed(path):
+            board = chess.Board(i)
+            node = get_node(board)
+            print(f"{node.ffen}")
+            node.update(res)
+            res = -res
+
+        board = chess.Board()
+        path= [board.fen()]
+        iters -= 1
+
+        with open('dicto.pkl', 'wb') as file:
+            pickle.dump(TranspositionTable, file)
+            print("DICTO SAVED")
+            print("DICTO SAVED")
+            print("DICTO SAVED")
+            # Use pickle.dump to serialize and save the object to the file
+        print("Game over!~")
+
+# build(iters=5413)
+# runStats()
+# graphit()
+
+play_game()
