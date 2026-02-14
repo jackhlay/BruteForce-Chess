@@ -8,4 +8,5 @@ It will make a dictionary of unassociated nodes that each have stats inside them
 
 I want to make a way to visualize the nodes, and how they connect as it plays games in real time but this may be out of reach for now.
 
-<!-- I intend to use this to give the mcts direction in which way to go, hopefully. idk if this is possible -->
+In theory, this should be able to get a good direction for what early moves are good based on continuously simulated percentages.
+It's executing effeciently and wrangling the node data that's the real challenge

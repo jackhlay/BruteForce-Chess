@@ -181,3 +181,4 @@ stockfishClient.go
 
 /.vscode
 *.pkl
+positions.duckdb

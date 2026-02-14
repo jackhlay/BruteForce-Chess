@@ -8,12 +8,14 @@ import json
 import websockets
 
 import chess
+import chess.polyglot
 import math
 import random
 import pickle
 import sys
 import time
 
+import duckdb
 
 
 iters = 537
@@ -30,12 +32,14 @@ class Node:
 
     def __init__(self, gameState: chess.Board):
         self.gameState = gameState
+        self.hash = chess.polyglot.zobrist_hash(gameState)
         fens = gameState.fen().split(" ")[:2]
         self.ffen = gameState.fen()
         self.fen = " ".join(fens)
         self.visited = 0
         self.totalValue = 0.0
         self.averageValue = 0.0
+        self.phase = get_phase(gameState)
         self.children = {}
 
     def update(self, value: float):
@@ -66,7 +70,30 @@ class Node:
         )
 
 
-  
+def get_phase(board: chess.Board):
+    """Determine the phase of the game based on material count."""
+    piece_values = {
+        chess.PAWN: 1,
+        chess.KNIGHT: 3,
+        chess.BISHOP: 3,
+        chess.ROOK: 5,
+        chess.QUEEN: 9
+    }
+    total_material = sum(
+        len(board.pieces(piece_type, chess.WHITE)) * value +
+        len(board.pieces(piece_type, chess.BLACK)) * value
+        for piece_type, value in piece_values.items()
+    )
+    if total_material > 55:
+        return 0  # Opening
+    elif 30 <= total_material <= 55:
+        return 1  # Middlegame
+    elif total_material <= 20:
+        return 2  # Endgame
+    else:
+        return 3  # Transition phase
+
+
 def get_node(gamestate: chess.Board) -> Node:
     fens = gamestate.fen().split(" ")[:2]
     fen = " ".join(fens)
@@ -168,6 +195,7 @@ def graphit(path=None):
 #UTIL FUNCTIONS
 ##################
 def sendpos(fen: str):
+    uri = "http://192.168.0.4:5000/api/update"
     payload = {
         "fen": fen,
         "evalSource1": "N/A",
@@ -177,7 +205,25 @@ def sendpos(fen: str):
     print(response.status_code, response.text)
     print(f"pos sent! {response}")
 
+def store_pos(hash, fen, total_value, visits, phase):
+    print(f"STORING: {fen} | {total_value} | {visits} | {phase}")
+    duckdb.sql("""
+        CREATE TABLE IF NOT EXISTS posTable (
+                hash UBIGINT PRIMARY KEY,
+                fen TEXT,
+                total_value FLOAT,
+                visits INT,
+                phase INT
+               );
+                """)
+    
+    duckdb.sql(f"""
+               INSERT OR REPLACE INTO posTable (hash, fen, total_value, visits, phase) VALUES ({hash}, '{fen}', {total_value}, {visits}, {phase});
+               """)
+    print(f"STORED: {fen} | {total_value} | {visits} | {phase}")
+
 async def query_stockfish(fen: str):
+    uri = "ws://192.168.0.4:4000/"
     async with websockets.connect(uri) as ws:
         # Send position and go
         await ws.send(json.dumps({"type": "uci:command", "payload": f"position fen {fen}"}))
@@ -195,6 +241,7 @@ def get_bestmove(fen: str):
     return res
 
 def play_game(iters=17):
+    duckdb.connect(database='positions.duckdb', read_only=False)
     board = chess.Board()
     path = [board.fen()]
     
@@ -202,17 +249,19 @@ def play_game(iters=17):
             TranspositionTable = pickle.load(file)
 
     for _ in range(iters):
+        print(f"STARTING ITER: {_+1}")
         if random.random() <= 0.5:
             fish = chess.BLACK
         else:
             fish = chess.WHITE
         while not board.is_game_over():
             if board.turn == fish:
-                move = chess.Move.from_uci(get_bestmove(board.fen()))
+                # move = chess.Move.from_uci(get_bestmove(board.fen()))
+                move = random.choice(list(board.legal_moves))
                 board.push(move)
                 path.append(board.fen())
-                sendpos(board.fen())
-                time.sleep(.7)
+                # sendpos(board.fen())
+                # time.sleep(.7)
             else:
                 node = get_node(board)
                 if not node.children:
@@ -224,8 +273,8 @@ def play_game(iters=17):
 
                 board.push(move)
                 path.append(board.fen())
-                sendpos(board.fen())
-                time.sleep(.1)
+                # sendpos(board.fen())
+                # time.sleep(.1)
         
         if board.is_game_over():
             result = board.result()
@@ -239,6 +288,7 @@ def play_game(iters=17):
         for i in reversed(path):
             board = chess.Board(i)
             node = get_node(board)
+            store_pos(node.hash, node.ffen, node.totalValue, node.visited, node.phase)
             print(f"{node.ffen}")
             node.update(res)
             res = -res
