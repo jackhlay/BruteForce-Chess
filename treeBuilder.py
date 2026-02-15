@@ -93,7 +93,6 @@ def get_phase(board: chess.Board):
     else:
         return 3  # Transition phase
 
-
 def get_node(gamestate: chess.Board) -> Node:
     fens = gamestate.fen().split(" ")[:2]
     fen = " ".join(fens)
@@ -101,45 +100,6 @@ def get_node(gamestate: chess.Board) -> Node:
         return TranspositionTable[fen]
     TranspositionTable[fen] = Node(gamestate)
     return TranspositionTable[fen]
-    
-def build(iters=iters):
-    board = chess.Board()
-    path = [board.fen()]
-    
-    with open('dicto.pkl', 'rb') as file:
-            TranspositionTable = pickle.load(file)
-
-    for _ in range(iters):
-        while not board.is_game_over():
-            moves=list(board.legal_moves)
-            caps_checks = [m for m in moves if (board.is_capture(m) or board.gives_check(m))]
-            move = random.choice(caps_checks) if caps_checks else random.choice(moves)
-            board.push(move)
-            path.append(board.fen())
-        
-        if board.is_game_over():
-            result = board.result()
-            if result == "1-0":
-                res = 1.0
-            elif result == "0-1":
-                res = -1.0
-            else:
-                res =  0.0
-    
-        for i in reversed(path):
-            board = chess.Board(i)
-            node = get_node(board)
-            print(f"{node.ffen}")
-            node.update(res)
-            res = -1*res
-
-        board = chess.Board()
-        path= [board.fen()]
-        iters -= 1
-
-    with open('dicto.pkl', 'wb') as file:
-        pickle.dump(TranspositionTable, file)
-        # Use pickle.dump to serialize and save the object to the file
 
 ####################
 # DEMO FUNCTIONS
@@ -215,11 +175,11 @@ def store_pos(hash, fen, total_value, visits, phase):
     # print(f"STORED: {hash} | {fen} | {total_value} | {visits} | {phase}")
 
 async def query_stockfish(fen: str):
-    uri = "ws://192.168.0.4:4000/"
+    uri = "ws://localhost:4000/"
     async with websockets.connect(uri) as ws:
         # Send position and go
         await ws.send(json.dumps({"type": "uci:command", "payload": f"position fen {fen}"}))
-        await ws.send(json.dumps({"type": "uci:command", "payload": "go depth 2"}))
+        await ws.send(json.dumps({"type": "uci:command", "payload": "go depth 8"}))
         # Wait for bestmove response
         async for msg in ws:
             print(msg)
@@ -232,7 +192,10 @@ def get_bestmove(fen: str):
     print(f"RES: {res}")
     return res
 
-def play_game(iters=17):
+def play_games(iters=None):
+    if not iters:
+        iters = random.randint(17, 193)
+    print(f"RUNNING FOR {iters} iters")
     getDuckDb()
     board = chess.Board()
     path = [board.fen()]
@@ -248,8 +211,8 @@ def play_game(iters=17):
             fish = chess.WHITE
         while not board.is_game_over():
             if board.turn == fish:
-                # move = chess.Move.from_uci(get_bestmove(board.fen()))
-                move = random.choice(list(board.legal_moves))
+                move = chess.Move.from_uci(get_bestmove(board.fen()))
+                # move = random.choice(list(board.legal_moves))
                 board.push(move)
                 path.append(board.fen())
                 # sendpos(board.fen())
@@ -298,7 +261,7 @@ def play_game(iters=17):
             # Use pickle.dump to serialize and save the object to the file
         print("Game over!~")
 
-# build(iters=5413)
-play_game()
+
+play_games()
 # runStats()
 # graphit()
