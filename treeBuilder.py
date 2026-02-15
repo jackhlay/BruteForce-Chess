@@ -131,7 +131,7 @@ def build(iters=iters):
             node = get_node(board)
             print(f"{node.ffen}")
             node.update(res)
-            res = -res
+            res = -1*res
 
         board = chess.Board()
         path= [board.fen()]
@@ -205,22 +205,14 @@ def sendpos(fen: str):
     print(response.status_code, response.text)
     print(f"pos sent! {response}")
 
+def getDuckDb():
+    con = duckdb.connect("positions.duckdb")
+    con.sql("CREATE TABLE IF NOT EXISTS posTable (hash UBIGINT PRIMARY KEY, fen TEXT, total_value FLOAT, visits INT, phase INT)")
+
 def store_pos(hash, fen, total_value, visits, phase):
-    print(f"STORING: {fen} | {total_value} | {visits} | {phase}")
-    duckdb.sql("""
-        CREATE TABLE IF NOT EXISTS posTable (
-                hash UBIGINT PRIMARY KEY,
-                fen TEXT,
-                total_value FLOAT,
-                visits INT,
-                phase INT
-               );
-                """)
-    
-    duckdb.sql(f"""
-               INSERT OR REPLACE INTO posTable (hash, fen, total_value, visits, phase) VALUES ({hash}, '{fen}', {total_value}, {visits}, {phase});
-               """)
-    print(f"STORED: {fen} | {total_value} | {visits} | {phase}")
+    with duckdb.connect("positions.duckdb") as con:
+        con.execute("INSERT OR REPLACE INTO posTable (hash, fen, total_value, visits, phase) VALUES (?, ?, ?, ?, ?)", (hash, fen, total_value, visits, phase))
+    # print(f"STORED: {hash} | {fen} | {total_value} | {visits} | {phase}")
 
 async def query_stockfish(fen: str):
     uri = "ws://192.168.0.4:4000/"
@@ -241,7 +233,7 @@ def get_bestmove(fen: str):
     return res
 
 def play_game(iters=17):
-    duckdb.connect(database='positions.duckdb', read_only=False)
+    getDuckDb()
     board = chess.Board()
     path = [board.fen()]
     
@@ -288,9 +280,10 @@ def play_game(iters=17):
         for i in reversed(path):
             board = chess.Board(i)
             node = get_node(board)
-            store_pos(node.hash, node.ffen, node.totalValue, node.visited, node.phase)
             print(f"{node.ffen}")
             node.update(res)
+            # print (f"UPDATING {node.fen} | {node.totalValue} | {node.visited} | {node.phase} | RES = {res}")
+            store_pos(node.hash, node.ffen, node.totalValue, node.visited, node.phase)
             res = -res
 
         board = chess.Board()
@@ -307,5 +300,5 @@ def play_game(iters=17):
 
 # build(iters=5413)
 play_game()
-runStats()
-graphit()
+# runStats()
+# graphit()
