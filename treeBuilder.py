@@ -179,7 +179,7 @@ async def query_stockfish(fen: str):
     async with websockets.connect(uri) as ws:
         # Send position and go
         await ws.send(json.dumps({"type": "uci:command", "payload": f"position fen {fen}"}))
-        await ws.send(json.dumps({"type": "uci:command", "payload": "go depth 8"}))
+        await ws.send(json.dumps({"type": "uci:command", "payload": "go depth 3"}))
         # Wait for bestmove response
         async for msg in ws:
             print(msg)
