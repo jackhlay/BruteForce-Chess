@@ -4,5 +4,10 @@ Need to rebuild analysis and quiescence search in addition to strengthen all sid
 
 ## treeBuilder.py will build tree data to a file in serializable form.  
 just use pickle.dumps() to convert it back to the {string:node} dict once you've built and retreived it.
-It will make a dictionary of unassociated nodes that each have stats inside them.
-It also stores info in a local duckdb
+It will make a dictionary of unassociated nodes that each have stats inside them.  
+It also stores info in a local duckdb.  
+
+<!-- TODO:
+MAKE SEARCH BY PIECE AND GAME PHASE FOR HEATMAPS
+
+ -->

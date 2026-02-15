@@ -262,6 +262,6 @@ def play_games(iters=None):
         print("Game over!~")
 
 
-play_games()
+play_games(55)
 # runStats()
 # graphit()
