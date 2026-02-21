@@ -1,6 +1,5 @@
-import seaborn as sns
 import matplotlib.pyplot as plt
-import pandas as pd
+
 
 import asyncio
 import requests
@@ -18,7 +17,6 @@ import time
 import duckdb
 
 
-iters = 537
 TranspositionTable = {}
 class Node:
     """
@@ -99,6 +97,7 @@ def get_node(gamestate: chess.Board) -> Node:
     if fen in TranspositionTable:
         return TranspositionTable[fen]
     TranspositionTable[fen] = Node(gamestate)
+
     return TranspositionTable[fen]
 
 ####################
@@ -167,11 +166,23 @@ def sendpos(fen: str):
 
 def getDuckDb():
     con = duckdb.connect("positions.duckdb")
-    con.sql("CREATE TABLE IF NOT EXISTS posTable (hash UBIGINT PRIMARY KEY, fen TEXT, total_value FLOAT, visits INT, phase INT)")
+    con.sql("CREATE TABLE IF NOT EXISTS posTable (hash UBIGINT PRIMARY KEY, fen TEXT, total_value FLOAT, visits INT DEFAULT 1, phase INT)")
 
-def store_pos(hash, fen, total_value, visits, phase):
+def store_pos(hash, fen, total_value, phase):
     with duckdb.connect("positions.duckdb") as con:
-        con.execute("INSERT OR REPLACE INTO posTable (hash, fen, total_value, visits, phase) VALUES (?, ?, ?, ?, ?)", (hash, fen, total_value, visits, phase))
+        # con.execute("INSERT OR REPLACE INTO posTable (hash, fen, total_value, visits, phase) VALUES (?, ?, ?, ?, ?)", (hash, fen, total_value, visits, phase))
+
+        con.execute("""
+            INSERT INTO posTable (hash, fen, total_value, phase)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(hash) DO UPDATE SET
+                visits = posTable.visits + 1,
+                total_value = posTable.total_value + EXCLUDED.total_value,
+                fen = EXCLUDED.fen,
+                phase = EXCLUDED.phase
+            """,
+            (hash, fen, total_value, phase)
+        )
     # print(f"STORED: {hash} | {fen} | {total_value} | {visits} | {phase}")
 
 async def query_stockfish(fen: str):
@@ -179,7 +190,7 @@ async def query_stockfish(fen: str):
     async with websockets.connect(uri) as ws:
         # Send position and go
         await ws.send(json.dumps({"type": "uci:command", "payload": f"position fen {fen}"}))
-        await ws.send(json.dumps({"type": "uci:command", "payload": "go depth 3"}))
+        await ws.send(json.dumps({"type": "uci:command", "payload": "go depth 1"}))
         # Wait for bestmove response
         async for msg in ws:
             print(msg)
@@ -246,7 +257,7 @@ def play_games(iters=None):
             print(f"{node.ffen}")
             node.update(res)
             # print (f"UPDATING {node.fen} | {node.totalValue} | {node.visited} | {node.phase} | RES = {res}")
-            store_pos(node.hash, node.ffen, node.totalValue, node.visited, node.phase)
+            store_pos(node.hash, node.ffen, res, node.phase)
             res = -res
 
         board = chess.Board()
@@ -262,6 +273,4 @@ def play_games(iters=None):
         print("Game over!~")
 
 
-play_games(55)
-# runStats()
-# graphit()
+play_games(19)
