@@ -16,6 +16,7 @@ import time
 
 import duckdb
 
+from engin import get_sfmove
 
 TranspositionTable = {}
 class Node:
@@ -66,7 +67,6 @@ class Node:
         return self.averageValue + (
             c * math.sqrt(math.log(parent_visits) / self.visited)
         )
-
 
 def get_phase(board: chess.Board):
     """Determine the phase of the game based on material count."""
@@ -153,17 +153,6 @@ def graphit(path=None):
 ##################
 #UTIL FUNCTIONS
 ##################
-def sendpos(fen: str):
-    uri = "http://192.168.0.4:5000/api/update"
-    payload = {
-        "fen": fen,
-        "evalSource1": "N/A",
-        "evalSource2": "N/A"
-    }
-    response = requests.post(uri, json=payload)  # Use json=payload
-    print(response.status_code, response.text)
-    print(f"pos sent! {response}")
-
 def getDuckDb():
     con = duckdb.connect("positions.duckdb")
     con.sql("CREATE TABLE IF NOT EXISTS posTable (hash UBIGINT PRIMARY KEY, fen TEXT, total_value FLOAT, visits INT DEFAULT 1, phase INT)")
@@ -185,23 +174,8 @@ def store_pos(hash, fen, total_value, phase):
         )
     # print(f"STORED: {hash} | {fen} | {total_value} | {visits} | {phase}")
 
-async def query_stockfish(fen: str):
-    uri = "ws://localhost:4000/"
-    async with websockets.connect(uri) as ws:
-        # Send position and go
-        await ws.send(json.dumps({"type": "uci:command", "payload": f"position fen {fen}"}))
-        await ws.send(json.dumps({"type": "uci:command", "payload": "go depth 1"}))
-        # Wait for bestmove response
-        async for msg in ws:
-            print(msg)
-            data = json.loads(msg)
-            if data.get("type") == "uci:response" and ("bestmove" in data.get("payload")):
-                return data["payload"].split(" ")[1]
 
-def get_bestmove(fen: str):
-    res = asyncio.run(query_stockfish(fen))
-    print(f"RES: {res}")
-    return res
+##################
 
 def play_games(iters=None):
     if not iters:
@@ -222,7 +196,7 @@ def play_games(iters=None):
             fish = chess.WHITE
         while not board.is_game_over():
             if board.turn == fish:
-                move = chess.Move.from_uci(get_bestmove(board.fen()))
+                move = chess.Move.from_uci(get_sfmove(board.fen()))
                 # move = random.choice(list(board.legal_moves))
                 board.push(move)
                 path.append(board.fen())
