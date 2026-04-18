@@ -178,7 +178,7 @@ cython_debug/
 .idea/
 uvicorn command.txt
 stockfishClient.go
-
+/treeBuilder
 /.vscode
 *.pkl
 positions.duckdb
