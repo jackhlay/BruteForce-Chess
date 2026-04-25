@@ -68,6 +68,7 @@ def _clear_heuristics():
     global _killers, _history
     _killers = [[None] * MAX_KILLERS for _ in range(256)]
     _history = {}
+    _pos_history = []
  
 def _store_killer(move, ply):
     if move not in _killers[ply]:

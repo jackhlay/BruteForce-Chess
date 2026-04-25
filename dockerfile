@@ -17,8 +17,7 @@ RUN useradd -m bot
 USER bot
 
 ENV LICHESS_TOKEN=""
-ENV CONCURRENCY="3"
 ENV TIME_LIMIT="3.247"
-
+ENV MAX_DEPTH="64"
 
 CMD ["python", "-u", "bot.py"]

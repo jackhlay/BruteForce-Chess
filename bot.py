@@ -11,6 +11,7 @@ import os
 import sys
 import time
 import logging
+import random
 import threading
  
 import berserk
@@ -24,10 +25,11 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 log = logging.getLogger("bot")
- 
-TOKEN      = os.environ["LICHESS_TOKEN"]
+
+games = {}
+
 TIME_LIMIT = float(os.environ.get("TIME_LIMIT", 5.0))
-MAX_DEPTH  = int(os.environ.get("MAX_DEPTH", 64))
+MAX_DEPTH  = int(os.environ.get("MAX_DEPTH", 999))
  
 session = berserk.TokenSession(TOKEN)
 client  = berserk.Client(session=session)
@@ -56,6 +58,7 @@ def play_game(game_id: str, bot_color: str):
             state = event["state"] if etype == "gameFull" else event
             if state.get("status") not in ("started", "created"):
                 log.info(f"[{game_id}] game over: {state.get('status')}")
+                games.pop(game_id)
                 return
  
             moves    = [m for m in state.get("moves", "").split() if m]
@@ -65,7 +68,10 @@ def play_game(game_id: str, bot_color: str):
  
             board = board_from_moves(moves)
             log.info(f"[{game_id}] thinking (ply {len(moves) + 1})...")
-            move = find_best_move(board, time_limit=TIME_LIMIT, max_depth=MAX_DEPTH)
+            if len(moves)+1 < 6:
+                move = random.choice(board.legal_moves())
+            else:
+                move = find_best_move(board, time_limit=TIME_LIMIT, max_depth=MAX_DEPTH)
             log.info(f"[{game_id}] playing {move}")
             client.bots.make_move(game_id, str(move))
  
@@ -80,10 +86,11 @@ def handle_events():
         if etype == "challenge":
             chal = event["challenge"]
             cid  = chal["id"]
-            if chal.get("variant", {}).get("key") != "standard":
+            if chal.get("variant", {}).get("key") != "standard" or len(games.keys())>2:
                 client.bots.decline_challenge(cid)
             else:
                 log.info(f"accepting challenge {cid}")
+                games[cid]=True
                 client.bots.accept_challenge(cid)
  
         elif etype == "gameStart":
