@@ -8,7 +8,7 @@ import time
 # ─────────────────────────────────────────────────────────────
 PIECE_VAL = {
     "pawn":   100,
-    "knight": 300, #320 default
+    "knight": 320,
     "bishop": 330,
     "rook":   500,
     "queen":  900,
@@ -98,11 +98,11 @@ def static_eval(board):
     qb = bcu.queen_bitboard(board)
  
     score = (
-        100 * (_popcount(wb & pb)  - _popcount(bb_ & pb))  +
-        320 * (_popcount(wb & nb)  - _popcount(bb_ & nb))  +
-        330 * (_popcount(wb & bib) - _popcount(bb_ & bib)) +
-        500 * (_popcount(wb & rb)  - _popcount(bb_ & rb))  +
-        900 * (_popcount(wb & qb)  - _popcount(bb_ & qb))
+        PIECE_VAL["pawn"] * (_popcount(wb & pb)  - _popcount(bb_ & pb))  +
+        PIECE_VAL["knight"] * (_popcount(wb & nb)  - _popcount(bb_ & nb))  +
+        PIECE_VAL["bishop"] * (_popcount(wb & bib) - _popcount(bb_ & bib)) +
+        PIECE_VAL["rook"] * (_popcount(wb & rb)  - _popcount(bb_ & rb))  +
+        PIECE_VAL["queen"] * (_popcount(wb & qb)  - _popcount(bb_ & qb))
     )
     return turn * score
  
@@ -227,7 +227,7 @@ def alphabeta(board: bc.Board, depth, alpha, beta, ply, deadline):
     if in_check and ply < _root_depth * 2:
         depth += 1
  
-    # Drop into quiescence at leaves
+    # Drop into quiescence and leaves
     if depth <= 0:
         return quiescence(board, alpha, beta)
  
@@ -256,7 +256,7 @@ def alphabeta(board: bc.Board, depth, alpha, beta, ply, deadline):
  
         # Futility pruning: skip quiet moves that can't improve alpha
         if do_futility and not is_cap and not is_promo:
-            if futility_base < alpha:   # eval + margin doesn't reach alpha → skip
+            if futility_base < alpha:
                 if best_score > -INF:   # only prune if we have at least one move scored
                     continue
  
@@ -324,10 +324,9 @@ def find_best_move(board:bc.Board, time_limit=5.0, max_depth=64):
     previous search results (hash move ordering is much better).
     Call tt_clear() manually if you start a new game.
     """
-    global _nodes, _stop_flag, _pos_history
+    global _nodes, _stop_flag, _root_depth
  
     _clear_heuristics()
-    _pos_history = []
     _stop_flag   = False
     _nodes       = 0
  

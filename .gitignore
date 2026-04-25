@@ -183,3 +183,4 @@ stockfishClient.go
 *.pkl
 positions.duckdb
 positions.duckdb.wal
+arena.py
