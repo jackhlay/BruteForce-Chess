@@ -1,19 +1,23 @@
 FROM python:3.13-alpine
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        gcc \
-        g++ \
-    && rm -rf /var/lib/apt/lists/*
+# Use apk instead of apt for Alpine
+RUN apk add --no-cache \
+    gcc \
+    g++ \
+    musl-dev \
+    linux-headers
 
 WORKDIR /app
 
 COPY reqs.txt .
 
+# Install dependencies before copying all code to use cache
 RUN pip install --no-cache-dir -r reqs.txt
 
 COPY engin.py bot.py ./
 
-RUN useradd -m bot
+# useradd is not in Alpine; use adduser
+RUN adduser -D bot
 USER bot
 
 ENV LICHESS_TOKEN=""
