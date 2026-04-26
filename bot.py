@@ -28,6 +28,7 @@ log = logging.getLogger("bot")
 
 games = {}
 
+TOKEN      = os.environ["LICHESS_TOKEN"]
 TIME_LIMIT = float(os.environ.get("TIME_LIMIT", 5.0))
 MAX_DEPTH  = int(os.environ.get("MAX_DEPTH", 999))
  
@@ -115,4 +116,4 @@ if __name__ == "__main__":
             handle_events()
         except Exception as e:
             log.exception(f"event loop error: {e}")
-            time.sleep(3)
+            time.sleep(5)
