@@ -26,8 +26,6 @@ logging.basicConfig(
 )
 log = logging.getLogger("bot")
 
-games = {}
-
 TOKEN      = os.environ["LICHESS_TOKEN"]
 TIME_LIMIT = float(os.environ.get("TIME_LIMIT", 5.0))
 MAX_DEPTH  = int(os.environ.get("MAX_DEPTH", 999))
@@ -59,7 +57,6 @@ def play_game(game_id: str, bot_color: str):
             state = event["state"] if etype == "gameFull" else event
             if state.get("status") not in ("started", "created"):
                 log.info(f"[{game_id}] game over: {state.get('status')}")
-                games.pop(game_id)
                 return
  
             moves    = [m for m in state.get("moves", "").split() if m]
@@ -87,11 +84,10 @@ def handle_events():
         if etype == "challenge":
             chal = event["challenge"]
             cid  = chal["id"]
-            if chal.get("variant", {}).get("key") != "standard" or len(games.keys())>2:
+            if chal.get("variant", {}).get("key") != "standard":
                 client.bots.decline_challenge(cid)
             else:
                 log.info(f"accepting challenge {cid}")
-                games[cid]=True
                 client.bots.accept_challenge(cid)
  
         elif etype == "gameStart":
@@ -117,3 +113,4 @@ if __name__ == "__main__":
         except Exception as e:
             log.exception(f"event loop error: {e}")
             time.sleep(5)
+            continue
