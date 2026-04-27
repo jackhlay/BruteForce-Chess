@@ -79,7 +79,7 @@ def play_game(game_id: str, bot_color: str):
                 player_time = state["wtime"] if bot_color == "white" else state["btime"]
                 log.info(f"PLAYER TIME: {player_time}")
                 timeEst = .04 * (player_time) 
-                log.info(f"TIME COMPARISON: HARD LIMIT: {TIME_LIMIT}, ESTIMATED (~4%): {timeEst.seconds}")
+                log.info(f"TIME COMPARISON: HARD LIMIT: {TIME_LIMIT}, ESTIMATED (~4%): {timeEst}")
                 move = find_best_move(board, time_limit=TIME_LIMIT, max_depth=MAX_DEPTH)
             log.info(f"[{game_id}] playing {move}")
             client.bots.make_move(game_id, str(move))
