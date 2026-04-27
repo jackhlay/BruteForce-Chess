@@ -26,8 +26,8 @@ logging.basicConfig(
 )
 log = logging.getLogger("bot")
 
-TOKEN      = os.environ["LICHESS_TOKEN"]
 CONCURRENCY = int(os.environ.get("CONCURRENCY", 3))
+TOKEN      = os.environ["TOKEN"]
 TIME_LIMIT = float(os.environ.get("TIME_LIMIT", 3.247))
 MAX_DEPTH  = int(os.environ.get("MAX_DEPTH", 999))
 
