@@ -27,9 +27,14 @@ logging.basicConfig(
 log = logging.getLogger("bot")
 
 TOKEN      = os.environ["LICHESS_TOKEN"]
-TIME_LIMIT = float(os.environ.get("TIME_LIMIT", 5.0))
+CONCURRENCY = int(os.environ.get("CONCURRENCY", 3))
+TIME_LIMIT = float(os.environ.get("TIME_LIMIT", 3.247))
 MAX_DEPTH  = int(os.environ.get("MAX_DEPTH", 999))
+
  
+active_games: set[str] = set()
+games_lock = threading.Lock()
+
 session = berserk.TokenSession(TOKEN)
 client  = berserk.Client(session=session)
  
@@ -57,6 +62,8 @@ def play_game(game_id: str, bot_color: str):
             state = event["state"] if etype == "gameFull" else event
             if state.get("status") not in ("started", "created"):
                 log.info(f"[{game_id}] game over: {state.get('status')}")
+                with games_lock:
+                    active_games.remove(game_id)
                 return
  
             moves    = [m for m in state.get("moves", "").split() if m]
@@ -69,6 +76,10 @@ def play_game(game_id: str, bot_color: str):
             if len(moves)+1 < 6:
                 move = random.choice(board.legal_moves())
             else:
+                player_time = state["wtime"] if bot_color == "white" else state["btime"]
+                log.info(f"PLAYER TIME: {player_time}")
+                timeEst = .04 * (player_time) 
+                log.info(f"TIME COMPARISON: HARD LIMIT: {TIME_LIMIT}, ESTIMATED (~4%): {timeEst.seconds}")
                 move = find_best_move(board, time_limit=TIME_LIMIT, max_depth=MAX_DEPTH)
             log.info(f"[{game_id}] playing {move}")
             client.bots.make_move(game_id, str(move))
@@ -80,20 +91,33 @@ def handle_events():
  
     for event in client.bots.stream_incoming_events():
         etype = event.get("type")
+        if len(active_games) >= CONCURRENCY:
+                client.bots.decline_challenge(cid)
+                log.info("DECLINED GAME {}, 3 RUNNING ALRADY", chal["id"])
  
         if etype == "challenge":
             chal = event["challenge"]
             cid  = chal["id"]
-            if chal.get("variant", {}).get("key") != "standard":
+
+            isNotStandard = chal.get("variant", {}).get("key") != "standard"
+            isRated = chal.get("rated")
+            isCorrespondence = chal.get('speed') == "correspondence"
+            atCapacity = len(active_games) >= CONCURRENCY
+
+            if isNotStandard or isRated or isCorrespondence or atCapacity:
                 client.bots.decline_challenge(cid)
+                log.info(f"DECLINED GAME {cid}, NonStandard?: {isNotStandard}, RATED?: {isRated}, Correspondence?:{isCorrespondence}, At CAPACITY?: {atCapacity}")
             else:
                 log.info(f"accepting challenge {cid}")
+
                 client.bots.accept_challenge(cid)
  
         elif etype == "gameStart":
             game      = event["game"]
             game_id   = game["gameId"]
             bot_color = game["color"]
+            with games_lock:
+                active_games.add(game_id)
             threading.Thread(
                 target=play_game,
                 args=(game_id, bot_color),
@@ -113,4 +137,6 @@ if __name__ == "__main__":
         except Exception as e:
             log.exception(f"event loop error: {e}")
             time.sleep(5)
+            session = berserk.TokenSession(TOKEN)
+            client  = berserk.Client(session=session)
             continue
