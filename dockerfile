@@ -20,7 +20,7 @@ COPY engin.py bot.py ./
 RUN adduser -D bot
 USER bot
 
-ENV TOKEN=""
+ENV LIP=""
 ENV TIME_LIMIT="3.247"
 ENV MAX_DEPTH="64"
 
