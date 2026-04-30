@@ -17,6 +17,7 @@ import threading
 import berserk
 from bulletchess import *
  
+from datetime import datetime, timedelta
 from engin import find_best_move, tt_clear, _pos_history
  
 logging.basicConfig(
@@ -50,7 +51,18 @@ def board_from_moves(move_list: list[str]) -> Board:
         _pos_history.append(board.__hash__())
     return board
  
- 
+def get_time_ms(value) -> int:
+    """Berserk will pass back a time of one of 3 types, seemingly at random. Sometimes an int, sometimes a timedelta, and sometimes a datetime... So we have to manually parse it."""
+    if isinstance(value, (int, float)):
+        log.debug(f"INT OR FLOAT: {value}")
+        return value
+    elif isinstance(value, datetime):
+        log.debug(F"DATETIME {value}, TOTAL SECONDS: {value.total_seconds() * 1000}")
+        return value.total_seconds() * 1000
+    elif isinstance(value, timedelta):
+        log.debug(F"timedelta {value}, TOTAL SECONDS: {value.total_seconds() * 1000}")
+        return value.total_seconds() * 1000
+
 def play_game(game_id: str, bot_color: str):
     log.info(f"[{game_id}] playing as {bot_color}")
     tt_clear()
@@ -77,10 +89,11 @@ def play_game(game_id: str, bot_color: str):
                 move = random.choice(board.legal_moves())
             else:
                 player_time = state["wtime"] if bot_color == "white" else state["btime"]
+                time_ms = get_time_ms(player_time)
                 log.info(f"PLAYER TIME: {player_time}")
-                timeEst = .04 * (player_time) 
+                timeEst = .04 * (time_ms / 1000) 
                 log.info(f"TIME COMPARISON: HARD LIMIT: {TIME_LIMIT}, ESTIMATED (~4%): {timeEst}")
-                move = find_best_move(board, time_limit=TIME_LIMIT, max_depth=MAX_DEPTH)
+                move = find_best_move(board, time_limit=min(timeEst,TIME_LIMIT), max_depth=MAX_DEPTH)
             log.info(f"[{game_id}] playing {move}")
             client.bots.make_move(game_id, str(move))
  
@@ -109,7 +122,6 @@ def handle_events():
                 log.info(f"DECLINED GAME {cid}, NonStandard?: {isNotStandard}, RATED?: {isRated}, Correspondence?:{isCorrespondence}, At CAPACITY?: {atCapacity}")
             else:
                 log.info(f"accepting challenge {cid}")
-
                 client.bots.accept_challenge(cid)
  
         elif etype == "gameStart":
